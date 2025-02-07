@@ -34,9 +34,10 @@ exports.registerUser = async (req, res) => {
     await sendVerificationEmail(email, verificationCode);
 
     res.status(201).json({ message: "User registered. Check email for verification code." });
-  } catch (error) {
+  } 
+    catch (error) {
     console.error("Registration Error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    // res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -78,7 +79,7 @@ exports.loginUser = async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
-    res.status(200).json({ message: "Login successful", token });
+    res.status(200).json({token});
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
