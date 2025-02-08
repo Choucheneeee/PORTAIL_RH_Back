@@ -72,15 +72,18 @@ exports.loginUser = async (req, res) => {
 
     if (!user.isVerified) return res.status(400).json({ message: "Email not verified" });
 
-    if (!user.isApproved) return res.status(403).json({ message: "Approval pending. Contact an admin." });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ message: "Email/password Incorrect" });
+
+    if (!user.isApproved) return res.status(403).json({ message: "Approval pending. Contact an admin." });
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
-    res.status(200).json({token});
-  } catch (error) {
+    res.status(200).json({ 
+      token: token, 
+      name: user.firstName 
+    });  } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
@@ -91,7 +94,7 @@ exports.verifyEmail = async (req, res) => {
     const { email, code } = req.body;
     const user = await User.findOne({ email });
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found Make Sign Up First  " });
     if (user.isVerified) return res.status(400).json({ message: "Email already verified" });
 
     if (user.verificationCode !== code) {

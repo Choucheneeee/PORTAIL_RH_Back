@@ -1,12 +1,12 @@
 
 const express = require("express");
-const {getalluser } = require("../controllers/userController");
+const {getuser } = require("../controllers/userController");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 
 
 
-router.get("/allEmployeers", authMiddleware, getalluser); // Protect this route
+router.get("/getuser", authMiddleware, getuser); // Protect this route
 
 
 module.exports = router;
