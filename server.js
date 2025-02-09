@@ -14,7 +14,13 @@ app.use(express.urlencoded({ extended: true }));
 connectDB();
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:4200"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Routes
