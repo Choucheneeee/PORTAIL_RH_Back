@@ -6,7 +6,7 @@ const authMiddleware = require("../middleware/auth");
 
 
 
-router.get("/getuser", authMiddleware, getuser); // Protect this route
+router.get("/getuser", authMiddleware, getuser); // Protect this routeS
 
 
 module.exports = router;
