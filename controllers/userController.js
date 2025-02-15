@@ -21,7 +21,6 @@ exports.getuser = async (req, res) => {
 const updateuser = async (req, res) => {
   try {
     const userId = req.user.id;  // Ensure that `authMiddleware` sets `req.user`
-    console.log(req.body);  // Logs the update data
 
     // Convert the date fields in req.body to Date objects if they exist and are in the correct format
     if (req.body.personalInfo && req.body.personalInfo.birthDate) {
