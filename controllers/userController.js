@@ -46,6 +46,30 @@ const updateuser = async (req, res) => {
   }
 };
 
-
-
 exports.updateuser = updateuser;
+
+
+
+exports.allusers = async (req, res) => {
+  try {
+    const users = await User.find();
+
+    const totalUsers = users.length;
+    const adminCount = users.filter(user => user.role === "admin").length;
+    const collaboratorCount =totalUsers - adminCount; 
+
+    const output = {
+      "Totalusers": totalUsers,
+      "Numberadmins": adminCount,
+      "Numbercollaborators": collaboratorCount,
+      "admin": users.filter(user => user.role === "admin"),
+      "collaborator": users.filter(user => user.role === "collaborateur")
+    };
+
+    res.json(output);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error fetching users");
+  }
+};
+
