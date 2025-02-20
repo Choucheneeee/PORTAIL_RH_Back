@@ -6,6 +6,7 @@ require("./routes/authRoutes");
 const app = express();
 
 
+
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
@@ -16,6 +17,7 @@ connectDB();
 // Middlewares
 app.use(cors({
   origin: ["http://localhost:4200"],
+  // origin:"**",
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
@@ -32,6 +34,8 @@ app.get("/", (req, res) => {
   // msg
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/user", require("./routes/userRoutes"));
+app.use("/api/requests", require("./routes/requestRoutes"));
+
 
 
 const PORT = process.env.PORT || 3000;

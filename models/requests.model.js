@@ -1,18 +1,56 @@
-// Requests model
-
 const mongoose = require("mongoose");
 
-const RequestSchema = new mongoose.Schema({
+const requestSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   type: { 
     type: String, 
-    enum: ["document", "formation", "congé", "prêt", "avance"], 
+    enum: [
+      "Employment & Work Documents",
+      "Payroll & Financial Documents",
+      "Leave & Time-Off Requests",
+      "HR & Administrative Requests"
+    ], 
     required: true 
+  },
+  documentType: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: function(value) {
+        const validDocumentTypes = {
+          "Employment & Work Documents": [
+            "Employment Certificate",
+            "Job Description",
+            "Work Transfer Request"
+          ],
+          "Payroll & Financial Documents": [
+            "Payslip",
+            "Salary Certificate",
+            "Tax Certificate"
+          ],
+          "Leave & Time-Off Requests": [
+            "Paid Leave Request",
+            "Sick Leave Request",
+            "Maternity/Paternity Leave"
+          ],
+          "HR & Administrative Requests": [
+            "Reference Letter",
+            "Resignation Request",
+            "ID Badge Replacement"
+          ]
+        };
+        return validDocumentTypes[this.type]?.includes(value);
+      },
+      message: props => `"${props.value}" is not a valid document type for ${props.instance.type}`
+    }
   },
   status: { type: String, enum: ["en attente", "validé", "rejeté"], default: "en attente" },
   details: String,
+  startDate: { type: Date }, // Only for leave requests
+  endDate: { type: Date },   // Only for leave requests
+  document: { type: mongoose.Schema.Types.ObjectId, ref: "Document" }, // Optional if document is generated
   createdAt: { type: Date, default: Date.now },
   updatedAt: Date
 });
 
-module.exports = mongoose.model("Request", RequestSchema);
+module.exports = mongoose.model("Request", requestSchema);

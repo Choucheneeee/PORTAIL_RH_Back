@@ -1,7 +1,4 @@
 const User = require("../models/User.model");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
@@ -13,7 +10,7 @@ exports.getuser = async (req, res) => {
       }
       res.json(user);
     })
-    .catch(error => {
+    .catch(() => {
       res.status(500).send('Error fetching user');
     });
 };
