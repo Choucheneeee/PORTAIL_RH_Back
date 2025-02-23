@@ -46,21 +46,23 @@ const updateuser = async (req, res) => {
 exports.updateuser = updateuser;
 
 
-
 exports.allusers = async (req, res) => {
-  try {
-    const users = await User.find();
+  try { 
+    // Fetch verified and unverified users separately
+    const verifiedUsers = await User.find({ isVerified: true });
+    const unverifiedUsers = await User.find({ isVerified: false });
 
-    const totalUsers = users.length;
-    const adminCount = users.filter(user => user.role === "admin").length;
-    const collaboratorCount =totalUsers - adminCount; 
+    const totalUsers = verifiedUsers.length;
+    const adminCount = verifiedUsers.filter(user => user.role === "admin").length;
+    const collaboratorCount = totalUsers - adminCount;
 
     const output = {
-      "Totalusers": totalUsers,
+      "Totalusers": totalUsers,  // Only counts verified users
       "Numberadmins": adminCount,
       "Numbercollaborators": collaboratorCount,
-      "admin": users.filter(user => user.role === "admin"),
-      "collaborator": users.filter(user => user.role === "collaborateur")
+      "admin": verifiedUsers.filter(user => user.role === "admin"),
+      "collaborator": verifiedUsers.filter(user => user.role === "collaborateur"),
+      "unverifiedUsers": unverifiedUsers // Include unverified users but don't count them
     };
 
     res.json(output);
