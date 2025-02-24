@@ -72,3 +72,61 @@ exports.allusers = async (req, res) => {
   }
 };
 
+exports.approveUser = async (req, res) => {
+  try {
+    const { userId } = req.body; // Get both userId and approve from the request body
+
+    // Ensure only admin can approve/disapprove
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Unauthorized You must have Admin Role" });
+    }
+
+    // Validate userId
+    if (!userId) {
+      return res.status(400).json({ message: "Missing userId field" });
+    }
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if(user.isApproved==true){
+      return res.status(400).json({ message: "User already approved" });
+    }
+    // Update the user's isApproved field to true
+    user.isApproved = true;
+    await user.save(); // Save the changes
+
+    return res.status(200).json({
+      message: "User approved successfully" ,
+      user,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error approving user" });
+  }
+};
+
+exports.deleteuser = async (req, res) => {
+  try {
+    const _id = req.params.userId; // Ensure that `authMiddleware` sets `req.user`
+
+    const deletedUser = await User.findByIdAndDelete(_id);
+
+    if (!deletedUser) {
+      return res.status(404).send('User not found');
+    }
+
+    res.json("User deleted successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Error deleting user');
+  }
+  };
+
+
+
+
