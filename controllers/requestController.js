@@ -4,10 +4,10 @@ const Request = require("../models/requests.model");  // ✅ Import the Request 
 
 exports.addRequest = async (req, res) => {
     try {
-      const { user, type, documentType, details, startDate, endDate } = req.body;
+      const { user,firstName,lastName, requestType, documentType, requestDetails, startDate, endDate } = req.body;
   
       // Validate required fields
-      if (!user || !type || !documentType) {
+      if (! user || ! requestType || !documentType) {
         return res.status(400).json({ error: "User, type, and documentType are required." });
       }
   
@@ -35,18 +35,20 @@ exports.addRequest = async (req, res) => {
         ]
       };
   
-      if (!validDocumentTypes[type]?.includes(documentType)) {
+      if (!validDocumentTypes[requestType]?.includes(documentType)) {
         return res.status(400).json({
-          error: `"${documentType}" is not a valid document type for "${type}".`
+          error: `"${documentType}" is not a valid document type for "${requestType}".`
         });
       }
   
       // Create new request
       const newRequest = new Request({
         user,
-        type,
+        requestType,
         documentType,
-        details,
+        firstName,
+        lastName,
+        requestDetails,
         startDate: startDate || null,
         endDate: endDate || null
       });

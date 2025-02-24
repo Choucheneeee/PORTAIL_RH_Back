@@ -2,7 +2,9 @@ const mongoose = require("mongoose");
 
 const requestSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  type: { 
+  firstName: { type: String, required: true },  
+  lastName: { type: String, required: true },
+  requestType: { 
     type: String, 
     enum: [
       "Employment & Work Documents",
@@ -45,7 +47,7 @@ const requestSchema = new mongoose.Schema({
     }
   },
   status: { type: String, enum: ["en attente", "validé", "rejeté"], default: "en attente" },
-  details: String,
+  requestDetails: String,
   startDate: { type: Date }, // Only for leave requests
   endDate: { type: Date },   // Only for leave requests
   document: { type: mongoose.Schema.Types.ObjectId, ref: "Document" }, // Optional if document is generated
