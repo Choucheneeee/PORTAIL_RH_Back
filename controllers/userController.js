@@ -1,4 +1,5 @@
 const User = require("../models/User.model");
+const Request = require("../models/requests.model");  // ✅ Import the Request model
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
@@ -51,13 +52,16 @@ exports.allusers = async (req, res) => {
     // Fetch verified and unverified users separately
     const verifiedUsers = await User.find({ isVerified: true });
     const unverifiedUsers = await User.find({ isVerified: false });
+    const requests = (await Request.find()).length;
+
 
     const totalUsers = verifiedUsers.length;
     const adminCount = verifiedUsers.filter(user => user.role === "admin").length;
     const collaboratorCount = totalUsers - adminCount;
 
     const output = {
-      "Totalusers": totalUsers,  // Only counts verified users
+      "Totalusers": totalUsers,
+      "request":requests,  // Only counts verified users
       "Numberadmins": adminCount,
       "Numbercollaborators": collaboratorCount,
       "admin": verifiedUsers.filter(user => user.role === "admin"),

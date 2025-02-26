@@ -1,22 +1,14 @@
 const express = require("express");
 const Request = require("../models/requests.model");
 const router = express.Router();
-const { addRequest }=require("../controllers/requestController");
+const { addRequest,getAllRequest }=require("../controllers/requestController");
 const authMiddleware = require("../middleware/auth");
 
 
 // 📌 Create a new request
 router.post("/addRequest",authMiddleware,addRequest);
 
-// 📌 Get all requests
-router.get("/", async (req, res) => {
-  try {
-    const requests = await Request.find().populate("user").populate("document");
-    res.json(requests);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+router.get("/",authMiddleware,getAllRequest )
 
 // 📌 Get a specific request by ID
 router.get("/:id", async (req, res) => {

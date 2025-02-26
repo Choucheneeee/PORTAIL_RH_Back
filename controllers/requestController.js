@@ -60,4 +60,15 @@ exports.addRequest = async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   };
+
+exports.getAllRequest =async(req,res)=>{
+  try {
+    const requests = await Request.find();
+      res.status(200).json(requests );
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+        }
+
+}
   
+

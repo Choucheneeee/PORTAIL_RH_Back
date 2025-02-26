@@ -46,7 +46,7 @@ const requestSchema = new mongoose.Schema({
       message: props => `"${props.value}" is not a valid document type for ${props.instance.type}`
     }
   },
-  status: { type: String, enum: ["en attente", "validé", "rejeté"], default: "en attente" },
+  status: { type: String, enum: ["Pending", "Accepted", "Declined"], default: "Pending" },
   requestDetails: String,
   startDate: { type: Date }, // Only for leave requests
   endDate: { type: Date },   // Only for leave requests
