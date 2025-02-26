@@ -31,7 +31,8 @@ exports.registerUser = async (req, res) => {
     });
 
     await user.save();
-    await sendVerificationEmail(email, verificationCode);
+    const name=firstName +" "+lastName
+    await sendVerificationEmail(email, verificationCode,name);
 
     res.status(201).json({ message: "User registered. Check email for verification code." });
   } 
@@ -41,7 +42,9 @@ exports.registerUser = async (req, res) => {
 };
 
 
-async function sendVerificationEmail(email, code) {
+async function sendVerificationEmail(email, code,name) {
+  console.log("name",name)
+
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -49,12 +52,18 @@ async function sendVerificationEmail(email, code) {
         pass: process.env.EMAIL_PASS,
     },
   });
-
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
     subject: "Email Verification",
-    text: `Your verification code is: ${code}`,
+    text: `Hey ${name}!
+
+A sign in attempt requires further verification because we did not recognize your device. To complete the sign in, enter the verification code on the unrecognized device.
+
+Verification code: ${code}
+
+Thanks,
+The Company Team`,
 };
 
 await transporter.sendMail(mailOptions);
