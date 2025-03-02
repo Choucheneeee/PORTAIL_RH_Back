@@ -71,22 +71,31 @@ exports.getAllRequest =async(req,res)=>{
 
 }
 
-exports.updatedRequest =async(req,res)=>{
-  try {
-    const requestId = req.params.id;
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({ error: "Request not found" });
-      }
-      const updatedRequest = await Request.findByIdAndUpdate(requestId, req.body, {
-        new: true,
-        });
-        res.status(200).json(updatedRequest);
-        } catch (error) {
-          res.status(500).json({ error: error.message });
-          }
+exports.updatedRequest = async (req, res) => {
+  const { id } = req.params; // Getting the request ID from the route parameter
+  const { status } = req.body; // Getting the new status from the body
 
-}
+  try {
+    // Find the request by its ID and update its status
+    const request = await Request.findByIdAndUpdate(
+      id, 
+      { status }, 
+      { new: true, runValidators: true } // `new: true` returns the updated document
+    );
+
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    // Return the updated request
+    res.status(200).json(request);
+  } catch (error) {
+    console.error('Error updating request:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+
 
 exports.deleteRequest =async(req,res)=>{
   try {
