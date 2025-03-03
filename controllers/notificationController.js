@@ -35,7 +35,7 @@ exports.getNotifications = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const notifications = await Notification.find({ user: userId, read: false }).sort({ createdAt: -1 });
+    const notifications = (await Notification.find({ user: userId}).sort({ createdAt: -1 }))
     console.log("notif",notifications)
     return res.status(200).json({ success: true, notifications });
   } catch (err) {
@@ -48,7 +48,6 @@ exports.markAsRead = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Mark notifications as read
     const notifications = await Notification.updateMany({ user: userId, read: false }, { read: true });
 
     return res.status(200).json({ success: true, message: 'Notifications marked as read' });
