@@ -29,13 +29,33 @@ app.use(express.urlencoded({ extended: true }));
 // Connect to MongoDB
 connectDB();
 
+let onlineUsers = new Set(); // Track unique connected users
+
 io.on('connection', (socket) => {
-  console.log('New client connected');
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
+    console.log(`New client connected: ${socket.id}`);
+
+    // Store user when they connect
+    onlineUsers.add(socket.id);
+    io.emit('onlineUsers', onlineUsers.size); // Send updated count
+
+    socket.on('disconnect', () => {
+        console.log(`Client disconnected: ${socket.id}`);
+        onlineUsers.delete(socket.id); // Remove user from the set
+        io.emit('onlineUsers', onlineUsers.size); // Update count
+    });
 });
+
+// API Route to Get Online Users
+app.get('/api/online-users', (req, res) => {
+    try {
+        res.json({ success: true, onlineUsers: onlineUsers.size });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error fetching online users' });
+    }
+});
+
+
+
 // Middlewares
 // In server.js
 
@@ -60,7 +80,6 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use('/api', notificationRoutes);
-
 
 
 const PORT = process.env.PORT || 3000;
