@@ -148,6 +148,18 @@ exports.getAllRequest = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.getOneRequest=async(req,res)=>{
+  try {
+    const request = await Request.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+      }
+      res.status(200).json(request);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    
+}
 
 exports.deleteRequest = async (req, res) => {
   try {
