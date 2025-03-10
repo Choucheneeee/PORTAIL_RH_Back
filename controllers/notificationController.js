@@ -31,6 +31,52 @@ exports.createNotification = async (req, res) => {
   }
 };
 
+
+exports.createNotificationAdmin = async (req, res) => {
+  console.log("I will send notification to admin");
+  try {
+    const { message, userId } = req.body;
+
+    // Validate request data
+    if (!userId || !message) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    console.log("req", req.body);
+    console.log(`Notification from ${userId}: ${message}`);
+
+    // Create a new notification
+    const notification = new Notification({
+      user: userId,
+      message: message
+    });
+
+    await notification.save();
+
+    // Find all admin users
+    const adminUsers = await User.find({ role: 'admin' });
+
+    // Emit the notification to each admin user (using socketId)
+    adminUsers.forEach(admin => {
+      // You should make sure that the socketId for each admin is correctly saved
+      if (admin.socketId) {
+        console.log("Sending notification to admin", admin._id);
+        // Emit the notification to the admin socket using the socketId
+        req.io.to(admin.socketId).emit('newNotification', message);
+      } else {
+        console.log(`Admin ${admin._id} is not connected (no socketId)`);
+      }
+    });
+
+    return res.status(201).json({ success: true, notification });
+  } catch (err) {
+    console.error("Error creating notification:", err);
+    return res.status(500).json({ success: false, message: 'Error creating notification' });
+  }
+};
+
+
+
 exports.getNotifications = async (req, res) => {
   try {
     const { userId } = req.params;

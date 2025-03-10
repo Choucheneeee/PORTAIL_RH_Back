@@ -6,6 +6,7 @@ require("./routes/authRoutes");
 const app = express();
 const socketIo = require('socket.io');
 const reportRoutes = require("./routes/documentRoutes");
+const User = require("./models/User.model")
 
 
 const http = require('http');
@@ -30,21 +31,58 @@ app.use(express.urlencoded({ extended: true }));
 // Connect to MongoDB
 connectDB();
 
-let onlineUsers = new Set(); // Track unique connected users
+
+
+const onlineUsers = new Map(); // To store socketId with userId and role
 
 io.on('connection', (socket) => {
     console.log(`New client connected: ${socket.id}`);
 
-    // Store user when they connect
-    onlineUsers.add(socket.id);
-    io.emit('onlineUsers', onlineUsers.size); // Send updated count
+    // Listen for authentication
+    socket.on('authenticate', async (userId) => {
+        // Fetch user from the database using _id
+        const user = await User.findById(userId);
+        if (user) {
+            // Store user info along with the socketId
+            onlineUsers.set(socket.id, { userId: user._id, role: user.role });
+            console.log(`User ${user._id} with role ${user.role} connected`);
+        }
 
+        // Emit the number of online users
+        io.emit('onlineUsers', onlineUsers.size);
+    });
+
+    // Handle notification sending to admins
+    socket.on('newNotification', (notification) => {
+        console.log('Notification:', notification);
+        const { userId, message } = notification;
+
+        // Emit notification to all connected admins
+        onlineUsers.forEach((userInfo, socketId) => {
+            if (userInfo.role === 'admin') {
+                io.to(socketId).emit('newNotification', message); // Emit the notification to the admin
+                console.log(`Notification sent to admin ${userInfo.userId} on socket ${socketId}`);
+            }
+        });
+    });
+
+    // Handle disconnect
     socket.on('disconnect', () => {
         console.log(`Client disconnected: ${socket.id}`);
-        onlineUsers.delete(socket.id); // Remove user from the set
-        io.emit('onlineUsers', onlineUsers.size); // Update count
+        const userInfo = onlineUsers.get(socket.id);
+        if (userInfo) {
+            onlineUsers.delete(socket.id); // Remove user from the map
+            console.log(`User ${userInfo.userId} disconnected`);
+        }
+
+        // Emit the number of online users
+        io.emit('onlineUsers', onlineUsers.size);
     });
 });
+
+
+
+
 
 // API Route to Get Online Users
 app.get('/api/online-users', (req, res) => {

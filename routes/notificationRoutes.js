@@ -11,4 +11,13 @@ router.get("/:userId", notificationController.getNotifications);
 // Mark notifications as read
 router.put("/:userId/read", notificationController.markAsRead);
 
+
+
+
+
+
+
+
+router.post("/send-notificationAdmin", notificationController.createNotificationAdmin);
+
 module.exports = router;
