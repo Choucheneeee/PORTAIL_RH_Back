@@ -52,7 +52,6 @@ io.on('connection', (socket) => {
         io.emit('onlineUsers', onlineUsers.size);
     });
 
-    // Handle notification sending to admins
     socket.on('newNotification', (notification) => {
         console.log('Notification:', notification);
         const { userId, message } = notification;
