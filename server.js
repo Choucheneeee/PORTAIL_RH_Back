@@ -33,6 +33,35 @@ connectDB();
 
 
 
+// server.js
+// server.js
+// Function to handle notifications from admin
+const adminNewNotification = (notification) => {
+    console.log('Admin sending Notification:', notification);
+    const { userId, message, senderRole } = notification;
+
+    // If an admin sends the notification, send it to all users except admins
+    onlineUsers.forEach((userInfo, socketId) => {
+        if (userInfo.role !== 'admin') { // Exclude the admin from receiving the notification
+            io.to(socketId).emit('newNotification', message);
+            console.log(`Notification sent to user ${userInfo.userId} on socket ${socketId}`);
+        }
+    });
+};
+
+// Function to handle notifications from users
+const userNewNotification = (notification) => {
+    console.log('User sending Notification:', notification);
+    const { userId, message, senderRole } = notification;
+
+    // If a user sends the notification, send it to all admins
+    onlineUsers.forEach((userInfo, socketId) => {
+        if (userInfo.role === 'admin') {
+            io.to(socketId).emit('newNotification', message);
+            console.log(`Notification sent to admin ${userInfo.userId} on socket ${socketId}`);
+        }
+    });
+};
 const onlineUsers = new Map(); // To store socketId with userId and role
 
 io.on('connection', (socket) => {
@@ -52,17 +81,14 @@ io.on('connection', (socket) => {
         io.emit('onlineUsers', onlineUsers.size);
     });
 
+    // Handle new notifications
     socket.on('newNotification', (notification) => {
-        console.log('Notification:', notification);
-        const { userId, message } = notification;
-
-        // Emit notification to all connected admins
-        onlineUsers.forEach((userInfo, socketId) => {
-            if (userInfo.role === 'admin') {
-                io.to(socketId).emit('newNotification', message); // Emit the notification to the admin
-                console.log(`Notification sent to admin ${userInfo.userId} on socket ${socketId}`);
-            }
-        });
+        const { senderRole } = notification;
+        if (senderRole === 'admin') {
+            adminNewNotification(notification);  // Call the function for admin notifications
+        } else if (senderRole === 'user') {
+            userNewNotification(notification);  // Call the function for user notifications
+        }
     });
 
     // Handle disconnect
@@ -78,6 +104,11 @@ io.on('connection', (socket) => {
         io.emit('onlineUsers', onlineUsers.size);
     });
 });
+
+
+app.set('io', io);
+
+
 
 
 
