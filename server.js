@@ -49,7 +49,6 @@ const adminNewNotification = (notification) => {
     });
 };
 
-// Function to handle notifications from users
 const userNewNotification = (notification) => {
     console.log('User sending Notification:', notification);
     const { userId, message, senderRole } = notification;
