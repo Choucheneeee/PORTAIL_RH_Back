@@ -4,116 +4,118 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 require("./routes/authRoutes");
 const app = express();
-const socketIo = require('socket.io');
 const reportRoutes = require("./routes/documentRoutes");
-const User = require("./models/User.model")
-
 
 const http = require('http');
-const notificationRoutes = require('./routes/notificationRoutes');
-
 const server = http.createServer(app);
 
 const io = require('socket.io')(server, {
   cors: {
-    origin: 'http://localhost:4200', // Replace with your frontend URL
+    origin: 'http://localhost:4200',
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true,
   },
 });
 
-
-app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 
+// Middleware to get user ID from query parameter (for testing)
+io.use((socket, next) => {
+    // Get user details from client connection
+    const userId = socket.handshake.query.userId;
+    const role = socket.handshake.query.role; // 'admin' or 'collaborateur'
+    
+    if (!userId || !role) return next(new Error("Authentication required"));
+    
+    socket.userId = userId;
+    socket.role = role;
+    next();
+  });
 
-// Connect to MongoDB
-connectDB();
+  let onlineUsers = new Set(); // Track unique connected users
 
 
+  io.on('connection', (socket) => {
+    console.log(`${socket.role} ${socket.userId} connected`);
+    onlineUsers.add(socket.id);
+    io.emit('onlineUsers', onlineUsers.size); // Send updated count
 
-// server.js
-// server.js
-// Function to handle notifications from admin
-const adminNewNotification = (notification) => {
-    console.log('Admin sending Notification:', notification);
-    const { userId, message, senderRole } = notification;
+    // Join user-specific room with verification
+    const userRoom = `user_${socket.userId}`;
+    socket.join(userRoom);
+    console.log(`User joined room: ${userRoom}`);
 
-    // If an admin sends the notification, send it to all users except admins
-    onlineUsers.forEach((userInfo, socketId) => {
-        if (userInfo.role !== 'admin') { // Exclude the admin from receiving the notification
-            io.to(socketId).emit('newNotification', message);
-            console.log(`Notification sent to user ${userInfo.userId} on socket ${socketId}`);
-        }
-    });
-};
-
-const userNewNotification = (notification) => {
-    console.log('User sending Notification:', notification);
-    const { userId, message, senderRole } = notification;
-
-    // If a user sends the notification, send it to all admins
-    onlineUsers.forEach((userInfo, socketId) => {
-        if (userInfo.role === 'admin') {
-            io.to(socketId).emit('newNotification', message);
-            console.log(`Notification sent to admin ${userInfo.userId} on socket ${socketId}`);
-        }
-    });
-};
-const onlineUsers = new Map(); // To store socketId with userId and role
-
-io.on('connection', (socket) => {
-    console.log(`New client connected: ${socket.id}`);
-
-    // Listen for authentication
-    socket.on('authenticate', async (userId) => {
-        // Fetch user from the database using _id
-        const user = await User.findById(userId);
-        if (user) {
-            // Store user info along with the socketId
-            onlineUsers.set(socket.id, { userId: user._id, role: user.role });
-            console.log(`User ${user._id} with role ${user.role} connected`);
-        }
-
-        // Emit the number of online users
-        io.emit('onlineUsers', onlineUsers.size);
+    // Verify room membership
+    io.in(userRoom).allSockets().then(sockets => {
+        console.log(`Current connections in ${userRoom}:`, sockets.size);
     });
 
-    // Handle new notifications
-    socket.on('newNotification', (notification) => {
-        const { senderRole } = notification;
-        if (senderRole === 'admin') {
-            adminNewNotification(notification);  // Call the function for admin notifications
-        } else if (senderRole === 'user') {
-            userNewNotification(notification);  // Call the function for user notifications
+    // Join admin room if user is admin
+    if (socket.role === 'admin') {
+        socket.join('admins');
+        console.log(`Admin joined admins room`);
+    }
+
+    // Notification handler with enhanced debugging
+    socket.on('notif', async (data) => {
+        try {
+            console.log(`\n--- NEW NOTIFICATION ---`);
+            console.log(`Sender: ${socket.role} ${socket.userId}`);
+            console.log(`Payload:`, JSON.stringify(data, null, 2));
+
+            if (socket.role === 'admin') {
+                if (!data.targetUserId) {
+                    throw new Error('Target user ID required for admin notifications');
+                }
+
+                const targetRoom = `user_${data.targetUserId}`;
+                console.log(`Attempting to notify room: ${targetRoom}`);
+
+                // Verify target room existence
+                const socketsInRoom = await io.in(targetRoom).allSockets();
+                console.log(`Active connections in ${targetRoom}:`, socketsInRoom.size);
+
+                if (socketsInRoom.size === 0) {
+                    
+                    console.warn(`Target user ${data.targetUserId} is not connected!`);
+                    return;
+                }
+
+                io.to(targetRoom).emit('notif', {
+                    type: 'request_update',
+                    message: data.message,
+                    senderId: socket.userId,
+                    timestamp: new Date().toISOString()
+                });
+
+                console.log(`Notification sent to ${targetRoom}`);
+
+            } else if (socket.role === 'collaborateur') {
+                console.log('Notifying all admins');
+                io.to('admins').emit('notif', {
+                    type: 'new_request',
+                    message: data.message,
+                    senderId: socket.userId,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        } catch (error) {
+            console.error("[NOTIFICATION ERROR]", error.message);
+            socket.emit('error', { message: error.message });
         }
     });
 
-    // Handle disconnect
     socket.on('disconnect', () => {
-        console.log(`Client disconnected: ${socket.id}`);
-        const userInfo = onlineUsers.get(socket.id);
-        if (userInfo) {
-            onlineUsers.delete(socket.id); // Remove user from the map
-            console.log(`User ${userInfo.userId} disconnected`);
-        }
+        console.log(`${socket.role} ${socket.userId} disconnected`);
+        socket.leave(`user_${socket.userId}`);
+        onlineUsers.delete(socket.id); // Remove user from the set
+        io.emit('onlineUsers', onlineUsers.size); // Update count
 
-        // Emit the number of online users
-        io.emit('onlineUsers', onlineUsers.size);
+        if (socket.role === 'admin') socket.leave('admins');
     });
 });
-
-
-app.set('io', io);
-
-
-
-
-
-
-
-// API Route to Get Online Users
+  
 app.get('/api/online-users', (req, res) => {
     try {
         res.json({ success: true, onlineUsers: onlineUsers.size });
@@ -123,31 +125,15 @@ app.get('/api/online-users', (req, res) => {
 });
 
 
-
-// Middlewares
-// In server.js
-
-// Add this after initializing socket.io
-app.use((req, res, next) => {
-  req.io = io;  // Attach the io object to the request
-  next();  
-});
-
-app.use(cors()); 
-
+connectDB();
+app.use(cors("*"));
 app.use(express.json());
 
 // Routes
-app.get("/", (req, res) => {
-    res.json("Connected !");
-  });
-  
-
-
+app.get("/", (req, res) => res.json("Connected!"));
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/requests", require("./routes/requestRoutes"));
-app.use('/api', notificationRoutes);
 app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 3000;

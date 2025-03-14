@@ -100,15 +100,18 @@ exports.updatedRequest = async (req, res) => {
     const user = await User.findById(request.user);
     if (user) {
       await sendUserNotification(user.email, request.firstName, request.lastName, request.requestType, request.documentType, status);
-    }
+      }
 
     res.status(200).json({ message: "Request updated successfully", data: request });
 
   } catch (error) {
     console.error("Error updating request:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: error.message });
   }
+
+
 };
+
 
 async function sendUserNotification(email, firstName, lastName, requestType, documentType, status) {
   const transporter = nodemailer.createTransport({
