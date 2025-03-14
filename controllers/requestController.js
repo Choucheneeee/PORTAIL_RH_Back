@@ -151,6 +151,16 @@ exports.getAllRequest = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getAllRequestCollab = async (req, res) => {
+  try {
+    const requests = await Request.find({ user: req.params.id });
+    res.status(200).json(requests);
+  }
+  catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
 exports.getOneRequest=async(req,res)=>{
   try {
     const request = await Request.findById(req.params.id);

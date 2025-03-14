@@ -1,7 +1,7 @@
 const express = require("express");
 const Request = require("../models/requests.model");
 const router = express.Router();
-const { addRequest,getAllRequest,updatedRequest,deleteRequest,getOneRequest }=require("../controllers/requestController");
+const { addRequest,getAllRequest,updatedRequest,deleteRequest,getOneRequest,getAllRequestCollab }=require("../controllers/requestController");
 const authMiddleware = require("../middleware/auth");
 
 
@@ -9,7 +9,10 @@ const authMiddleware = require("../middleware/auth");
 router.post("/addRequest",authMiddleware,addRequest);
 
 router.get("/",authMiddleware,getAllRequest )
-router.get("/:id",getOneRequest)
+router.get("/:id",authMiddleware,getOneRequest)
+
+
+router.get("/getreqCollab/:id",authMiddleware,getAllRequestCollab )
 
 // 📌 Get a specific request by ID
 router.put("/update/:id",authMiddleware,updatedRequest )
