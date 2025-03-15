@@ -56,6 +56,9 @@ io.use((socket, next) => {
         socket.join('admins');
         console.log(`Admin joined admins room`);
     }
+    socket.on('request-online-users', () => {
+        socket.emit('online-users', onlineUsers.size);
+      });   
 
     // Notification handler with enhanced debugging
     socket.on('notif', async (data) => {
