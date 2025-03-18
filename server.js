@@ -56,6 +56,22 @@ io.use((socket, next) => {
         socket.join('admins');
         console.log(`Admin joined admins room`);
     }
+    socket.on('chat-message', (data) => {
+        console.log('Received message:', {
+          from: socket.userId,
+          to: data.recipientId,
+          content: data.message
+        });
+    
+        // Broadcast to recipient
+        const recipientRoom = `user_${data.recipientId}`;
+        socket.to(recipientRoom).emit('chat-message', {
+          senderId: socket.userId,
+          message: data.message,
+          timestamp: new Date().toISOString()
+        });
+      });
+    
     socket.on('request-online-users', () => {
         socket.emit('online-users', onlineUsers.size);
       });   
