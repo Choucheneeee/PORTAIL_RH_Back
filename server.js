@@ -63,7 +63,6 @@ io.use((socket, next) => {
           content: data.message
         });
     
-        // Broadcast to recipient
         const recipientRoom = `user_${data.recipientId}`;
         socket.to(recipientRoom).emit('chat-message', {
           senderId: socket.userId,
