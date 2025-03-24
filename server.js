@@ -33,52 +33,64 @@ io.use((socket, next) => {
     next();
   });
 
-  let onlineUsers = new Set(); // Track unique connected users
+  let onlineUsers = new Set(); // Track user IDs instead of socket IDs
 
 
-  io.on('connection', (socket) => {
-    console.log(`${socket.role} ${socket.userId} connected`);
-    onlineUsers.add(socket.id);
-    io.emit('onlineUsers', onlineUsers.size); // Send updated count
+  // Server-side (Socket.IO) with online status tracking
+let userConnections = new Map(); // Tracks { userId: connectionCount }
 
-    // Join user-specific room with verification
-    const userRoom = `user_${socket.userId}`;
+io.on('connection', (socket) => {
+    const userId = socket.userId;
+    console.log(`${socket.role} ${userId} connected`);
+
+    // Update connection count
+    const connections = userConnections.get(userId) || 0;
+    userConnections.set(userId, connections + 1);
+    
+    // Notify ONLY if this was first connection
+    io.emit('online-users', Array.from(onlineUsers)); // Broadcast to all clients
+
+    if (connections === 0) {
+        io.emit('online-users', Array.from(userConnections.keys()));
+    }
+
+    // Join user-specific room
+    const userRoom = `user_${userId}`;
     socket.join(userRoom);
     console.log(`User joined room: ${userRoom}`);
-
-    // Verify room membership
-    io.in(userRoom).allSockets().then(sockets => {
-        console.log(`Current connections in ${userRoom}:`, sockets.size);
-    });
 
     // Join admin room if user is admin
     if (socket.role === 'admin') {
         socket.join('admins');
         console.log(`Admin joined admins room`);
     }
+
+    // Message handling
     socket.on('chat-message', (data) => {
         console.log('Received message:', {
-          from: socket.userId,
-          to: data.recipientId,
-          content: data.message
+            from: userId,
+            to: data.recipientId,
+            content: data.message
         });
-    
+
         const recipientRoom = `user_${data.recipientId}`;
         socket.to(recipientRoom).emit('chat-message', {
-          senderId: socket.userId,
-          message: data.message,
-          timestamp: new Date().toISOString()
+            senderId: userId,
+            message: data.message,
+            timestamp: new Date().toISOString()
         });
-      });
-    
-    socket.on('request-online-users', () => {
-        socket.emit('online-users', onlineUsers.size);
-      });   
+    });
 
+    // Online users handling
+    socket.on('request-online-users', () => {
+        socket.emit('online-users', Array.from(userConnections.keys()));
+    });
+
+    // Notification handling
     socket.on('notif', async (data) => {
         try {
             console.log(`\n--- NEW NOTIFICATION ---`);
-            console.log(`Sender: ${socket.role} ${socket.userId}`);
+            console.log(`Sender: ${socket.role} ${userId}`);
             console.log(`Payload:`, JSON.stringify(data, null, 2));
 
             if (socket.role === 'admin') {
@@ -94,7 +106,6 @@ io.use((socket, next) => {
                 console.log(`Active connections in ${targetRoom}:`, socketsInRoom.size);
 
                 if (socketsInRoom.size === 0) {
-                    
                     console.warn(`Target user ${data.targetUserId} is not connected!`);
                     return;
                 }
@@ -102,7 +113,7 @@ io.use((socket, next) => {
                 io.to(targetRoom).emit('notif', {
                     type: 'request_update',
                     message: data.message,
-                    senderId: socket.userId,
+                    senderId: userId,
                     timestamp: new Date().toISOString()
                 });
 
@@ -113,7 +124,7 @@ io.use((socket, next) => {
                 io.to('admins').emit('notif', {
                     type: 'new_request',
                     message: data.message,
-                    senderId: socket.userId,
+                    senderId: userId,
                     timestamp: new Date().toISOString()
                 });
             }
@@ -123,12 +134,20 @@ io.use((socket, next) => {
         }
     });
 
+    // Disconnect handling
     socket.on('disconnect', () => {
-        console.log(`${socket.role} ${socket.userId} disconnected`);
-        socket.leave(`user_${socket.userId}`);
-        onlineUsers.delete(socket.id); // Remove user from the set
-        io.emit('onlineUsers', onlineUsers.size); // Update count
+        console.log(`${socket.role} ${userId} disconnected`);
+        
+        // Update connection count
+        const connections = userConnections.get(userId) || 1;
+        if (connections === 1) {
+            userConnections.delete(userId);
+        } else {
+            userConnections.set(userId, connections - 1);
+        }
 
+        io.emit('online-users', Array.from(userConnections.keys()));
+        socket.leave(userRoom);
         if (socket.role === 'admin') socket.leave('admins');
     });
 });
