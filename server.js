@@ -170,6 +170,7 @@ app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/message", require("./routes/messagesRoutes"));
+app.use("/api/notification", require("./routes/notificationRoutes"));
 
 app.use("/api/reports", reportRoutes);
 

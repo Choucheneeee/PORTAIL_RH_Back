@@ -3,7 +3,7 @@ const router = express.Router();
 const messageController = require('../controllers/messagesController');
 const authMiddleware = require('../middleware/auth'); // Your authentication middleware
 
-// router.use(authMiddleware);
+router.use(authMiddleware);
 
 router.post('/', messageController.sendMessage);
 

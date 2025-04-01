@@ -7,18 +7,18 @@ const authMiddleware = require("../middleware/auth");
 router.post("/send-notification",authMiddleware, notificationController.createNotification);
 
 // Get notifications for a specific user
-router.get("/:userId", authMiddleware,notificationController.getNotifications);
+// router.get("/:userId", authMiddleware,notificationController.getNotifications);
 
-// Mark notifications as read
-router.put("/:userId/read",authMiddleware, notificationController.markAsRead);
-
-
+// // Mark notifications as read
+// router.put("/:userId/read",authMiddleware, notificationController.markAsRead);
 
 
 
 
 
 
-router.post("/send-notificationAdmin",authMiddleware, notificationController.createNotificationAdmin);
+
+
+// router.post("/send-notificationAdmin",authMiddleware, notificationController.createNotificationAdmin);
 
 module.exports = router;
