@@ -44,7 +44,7 @@ exports.createNotification = async (req, res) => {
       }));
       console.log("notificationssss",notifications)
 
-      await Notification.insertMany(notifications);
+      await notification.insertMany(notifications);
       return res.status(201).json({ message: 'Notification sent to all admins' });
     }
 
@@ -54,3 +54,16 @@ exports.createNotification = async (req, res) => {
   }
 }
     
+exports.getNotifications =async (req,res)=>{
+  try {
+    const userId=req.params.userId
+    const notifications = await notification.find({ recipient: userId }).sort({ createdAt: -1 });
+    if (!notifications) {
+      return res.status(404).json({ message: 'No notifications found' });
+    }
+    return res.status(200).json(notifications);
+  }
+  catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+} 
