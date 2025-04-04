@@ -29,8 +29,8 @@ exports.createNotification = async (req, res) => {
     }
     else if (sender.role === 'collaborateur') {
         console.log("colaaborateur notification to all admins")
-      // Collaborator sending to all admins
-      const admins = await User.find({ role: 'admin' });
+
+        const admins = await User.find({ role: 'admin' });
 
       if (admins.length === 0) {
         return res.status(404).json({ message: 'No admins found' });
