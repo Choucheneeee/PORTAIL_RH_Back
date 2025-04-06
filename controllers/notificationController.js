@@ -8,7 +8,6 @@ exports.createNotification = async (req, res) => {
     const { message, recipientId } = req.body;
 
     if (sender.role === 'admin') {
-      // Admin sending to specific collaborator
       if (!recipientId) {
         return res.status(400).json({ message: 'Recipient ID is required' });
       }
