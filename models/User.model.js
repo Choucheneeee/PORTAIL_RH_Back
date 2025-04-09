@@ -11,7 +11,7 @@ const UserSchema = new mongoose.Schema({
     isVerified: { type: Boolean, default: false },
     isApproved: { type: Boolean, default: false }, 
     verificationCode: { type: String },
-    role: { type: String, enum: ["admin", "collaborateur"], required: true },
+    role: { type: String, enum: ["admin", "collaborateur","rh"], required: true },
     personalInfo: {
       phone: String,
       address: String,
