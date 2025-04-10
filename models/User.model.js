@@ -16,6 +16,7 @@ const UserSchema = new mongoose.Schema({
     resetTokenExpiration: Date,
     personalInfo: {
       phone: String,
+      countryCode: String,
       address: String,
       birthDate: Date,
     },
