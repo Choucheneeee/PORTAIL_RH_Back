@@ -4,6 +4,7 @@ const User = require("../models/User.model");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const crypto = require('crypto');
 
 exports.registerUser = async (req, res) => {
   try {
@@ -144,3 +145,68 @@ exports.approveUser = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
+
+exports.forgotPassword =async (req, res) => {
+  try {
+    console.log("i get email")
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+    console.log("email",email)
+
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Generate reset token and expiry (e.g., 1 hour)
+    const token = crypto.randomBytes(20).toString('hex');
+    user.resetToken = token;
+    user.resetTokenExpiration = Date.now() + 3600000; // 1 hour
+    await user.save();
+
+    // Send email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+      },
+    });
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Email Verification",
+      text: `Hey ${user?.firstName} ${user?.lastName} !
+      Please click on the following link to verify your email address:
+      ${process.env.FRONTEND_URL}/reset-password?token=${token}
+      Thanks,
+      The Company Team`,
+    };
+    await transporter.sendMail(mailOptions);
+    console.log("email sent")
+
+    res.status(200).json({ message: 'Reset email sent' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiration: { $gt: Date.now() }, // Check if token is valid
+    });
+
+    if (!user) return res.status(400).json({ message: 'Invalid or expired token' });
+      user.password = await bcrypt.hash(newPassword, 12);
+    user.resetToken = undefined;
+    user.resetTokenExpiration = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password updated' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}

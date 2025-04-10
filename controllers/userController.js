@@ -65,6 +65,7 @@ exports.allusers = async (req, res) => {
       "Numberadmins": adminCount,
       "Numbercollaborators": collaboratorCount,
       "admin": verifiedUsers.filter(user => user.role === "admin"),
+      "rh": verifiedUsers.filter(user => user.role === "rh"),
       "collaborator": verifiedUsers.filter(user => user.role === "collaborateur"),
       "unverifiedUsers": unverifiedUsers // Include unverified users but don't count them
     };
