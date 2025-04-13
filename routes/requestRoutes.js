@@ -1,24 +1,22 @@
 const express = require("express");
 const Request = require("../models/requests.model");
 const router = express.Router();
-const { addRequest,getAllRequest,updatedRequest,deleteRequest,getOneRequest,getAllRequestCollab }=require("../controllers/requestController");
-const authMiddleware = require("../middleware/auth");
+const {
+  createRequest,
+  getAllRequests,
+  getRequestById,
+  updateRequest,
+  deleteRequest,
+  getCollaboratorRequests
+} = require("../controllers/requestController");
+const auth = require("../middleware/auth");
 
-
-// 📌 Create a new request
-router.post("/addRequest",authMiddleware,addRequest);
-
-router.get("/",authMiddleware,getAllRequest )
-router.get("/:id",authMiddleware,getOneRequest)
-
-
-router.get("/getreqCollab/:id",authMiddleware,getAllRequestCollab )
-
-// 📌 Get a specific request by ID
-router.put("/update/:id",authMiddleware,updatedRequest )
-
-
-// 📌 Delete a request
-router.delete("/deletereq/:id",authMiddleware,deleteRequest )
+// Unified Request Endpoints
+router.post("/", auth, createRequest);
+router.get("/", auth, getAllRequests);
+router.get("/collaborator", auth, getCollaboratorRequests);
+router.get("/:id", auth, getRequestById);
+router.put("/:id", auth, updateRequest);
+router.delete("/:id", auth, deleteRequest);
 
 module.exports = router;

@@ -30,6 +30,7 @@ const UserSchema = new mongoose.Schema({
       maritalStatus: String,
       children: Number,
     },
+    timeOffBalance: { type: Number, default: 28 },
     createdAt: { type: Date, default: Date.now },
   });
   

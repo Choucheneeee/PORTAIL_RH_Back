@@ -50,8 +50,9 @@ const requestSchema = new mongoose.Schema({
   requestDetails: String,
   startDate: { type: Date }, // Only for leave requests
   endDate: { type: Date },   // Only for leave requests
-  document: { type: mongoose.Schema.Types.ObjectId, ref: "Document" }, // Optional if document is generated
+  document: { type: mongoose.Schema.Types.ObjectId, ref: "Document" },
   createdAt: { type: Date, default: Date.now },
+  numberOfDays: { type: Number },
   updatedAt: Date
 });
 
