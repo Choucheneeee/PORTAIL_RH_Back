@@ -31,8 +31,7 @@ exports.getMessages = async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.query.currentUserId;
-    console.log("userid",userId);
-    console.log("cureent id",currentUserId);
+    
 
     const messages = await Message.find({
       $or: [
@@ -43,7 +42,6 @@ exports.getMessages = async (req, res) => {
     .sort({ timestamp: 1 })
     .populate('sender', 'username avatar') // Adjust fields as needed
     .populate('receiver', 'username avatar');
-    console.log(messages);
 
     res.json(messages);
   } catch (error) {

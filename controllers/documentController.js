@@ -31,7 +31,6 @@ exports.generateWorkCertificate = (req, res) => {
                     console.error("Error sending file:", err);
                     return res.status(500).json({ message: "Error downloading the report" });
                 }
-                console.log("Report generated and sent successfully");
             });
         });
     } catch (error) {

@@ -2,7 +2,6 @@ const notification = require('../models/notifications.model');
 const User = require("../models/User.model");
 
 exports.createNotification = async (req, res) => {
-    console.log("sent notification")
    try {
     const sender = req.user;
     const { message, recipientId } = req.body;
@@ -22,26 +21,22 @@ exports.createNotification = async (req, res) => {
         message
       });
 
-      console.log("notification",notifications)
       await notifications.save();
       return res.status(201).json(notification);
     }
     else if (sender.role === 'collaborateur') {
-        console.log("colaaborateur notification to all admins")
 
         const admins = await User.find({ role: 'admin' });
 
       if (admins.length === 0) {
         return res.status(404).json({ message: 'No admins found' });
       }
-      console.log("admin",admins)
-      console.log("sender id",sender.id)
+      
       const notifications = admins.map(admin => ({
         sender: sender.id,
         recipient: admin._id,
         message
       }));
-      console.log("notificationssss",notifications)
 
       await notification.insertMany(notifications);
       return res.status(201).json({ message: 'Notification sent to all admins' });

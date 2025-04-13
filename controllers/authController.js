@@ -44,7 +44,6 @@ exports.registerUser = async (req, res) => {
 
 
 async function sendVerificationEmail(email, code,name) {
-  console.log("name",name)
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -150,10 +149,8 @@ exports.approveUser = async (req, res) => {
 
 exports.forgotPassword =async (req, res) => {
   try {
-    console.log("i get email")
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
-    console.log("email",email)
 
     const user = await User.findOne({ email: req.body.email });
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -183,7 +180,6 @@ exports.forgotPassword =async (req, res) => {
       The Company Team`,
     };
     await transporter.sendMail(mailOptions);
-    console.log("email sent")
 
     res.status(200).json({ message: 'Reset email sent' });
   } catch (err) {
