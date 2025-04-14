@@ -1,7 +1,8 @@
 const Request = require("../models/requests.model");
+const Document = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
-
+const { generateEmploymentCertificate } = require("../utils/pdfGenerator");
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate) {
   let count = 0;
@@ -64,6 +65,16 @@ exports.createRequest = async (req, res) => {
 
       const start = new Date(startDate);
       const end = new Date(endDate);
+
+      if (start < new Date().setHours(0,0,0,0)) {
+        return res.status(400).json({ error: "Start date cannot be in the past" });
+      }
+      
+      // Maximum consecutive days limit
+      if (numberOfDays > 14) {
+        return res.status(400).json({ error: "Maximum 14 consecutive days allowed" });
+      }
+
       if (start >= end) {
         return res.status(400).json({ error: "End date must be after start date" });
       }
@@ -82,6 +93,32 @@ exports.createRequest = async (req, res) => {
       requestData.numberOfDays = numberOfDays;
     }
 
+    if (requestType === "Employment & Work Documents") {
+      // Validate required professional info
+      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
+        return res.status(400).json({ 
+          error: "User professional information is required for this request" 
+        });
+      }
+    
+      // Employment Certificate specific validation
+      if (documentType === "Employment Certificate") {
+        if (!user.professionalInfo.hiringDate) {
+          return res.status(400).json({
+            error: "Hiring date is required for employment certificate"
+          });
+        }
+      }
+    
+      // Job Description validation
+      if (documentType === "Job Description") {
+        if (!user.professionalInfo.jobDescription) {
+          return res.status(400).json({
+            error: "Job description details not found"
+          });
+        }
+      }
+    }
     const newRequest = new Request(requestData);
     await newRequest.save();
 
@@ -139,10 +176,10 @@ exports.updateRequest = async (req, res) => {
       return res.status(404).json({ error: "Request not found" });
     }
 
-    // Handle status changes for time-off requests
     if (request.requestType === 'Leave & Time-Off Requests') {
       const user = await User.findById(request.user);
       
+      // Original time-off balance logic
       if (status === 'Accepted' && request.status !== 'Accepted') {
         if (user.timeOffBalance < request.numberOfDays) {
           return res.status(400).json({ error: 'Insufficient time off balance' });
@@ -156,6 +193,22 @@ exports.updateRequest = async (req, res) => {
         await user.save();
       }
     }
+    else if (request.requestType === 'Employment & Work Documents' && status === 'Accepted') {
+      const user = await User.findById(request.user);
+      const docData = await generateEmploymentCertificate(user, request);
+      
+      const document = new Document({
+        ...docData,
+        type: 'Employment Certificate', // Explicitly set required field
+
+        generatedFor: request._id,
+        generatedBy: req.user.id,
+        accessRoles: ['employee', 'hr']
+      });
+
+      await document.save();
+      request.document = document._id;
+    }
 
     const updatedRequest = await Request.findByIdAndUpdate(
       id,
@@ -163,7 +216,7 @@ exports.updateRequest = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Notify user
+    // Notification logic
     const user = await User.findById(request.user);
     if (user) {
       await sendUserNotification(
@@ -176,12 +229,63 @@ exports.updateRequest = async (req, res) => {
       );
     }
 
-    res.status(200).json({ message: "Request updated successfully", data: updatedRequest });
+    res.status(200).json({ 
+      message: "Request updated successfully", 
+      data: updatedRequest 
+    });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
+
+// Helper function for time-off requests
+async function handleTimeOffRequest(request, status, session) {
+  const user = await User.findById(request.user).session(session);
+  
+  if (status === 'Accepted' && request.status !== 'Accepted') {
+    if (user.timeOffBalance < request.numberOfDays) {
+      throw new Error('Insufficient time off balance');
+    }
+    user.timeOffBalance -= request.numberOfDays;
+    await user.save({ session });
+  }
+  
+  if (status === 'Declined' && request.status === 'Accepted') {
+    user.timeOffBalance += request.numberOfDays;
+    await user.save({ session });
+  }
+}
+
+// Helper function for employment documents
+async function handleEmploymentDocument(request, generatorId, session) {
+  const user = await User.findById(request.user).session(session);
+  
+  // Validate professional info
+  if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
+    throw new Error('Missing professional information for document generation update your account ');
+  }
+
+  // Generate PDF document
+  const docData = await generateEmploymentCertificate(user, request);
+  
+  // Create document record
+  const document = new Document({
+    ...docData,
+    generatedFor: request._id,
+    generatedBy: generatorId,
+    accessRoles: ['employee', 'hr']
+  });
+
+  await document.save({ session });
+  
+  // Link document to request
+  request.document = document._id;
+  await request.save({ session });
+}
 
 exports.deleteRequest = async (req, res) => {
   try {

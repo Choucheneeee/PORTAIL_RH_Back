@@ -4,7 +4,6 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 require("./routes/authRoutes");
 const app = express();
-const reportRoutes = require("./routes/documentRoutes");
 
 const http = require('http');
 const server = http.createServer(app);
@@ -172,7 +171,6 @@ app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
 
-app.use("/api/reports", reportRoutes);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
