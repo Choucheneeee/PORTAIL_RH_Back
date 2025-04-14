@@ -35,8 +35,6 @@ const generateEmploymentCertificate = async (user, request) => {
           text: [
             { text: 'Employee Name: ', bold: true },
             `${user.firstName || 'N/A'} ${user.lastName || 'N/A'}\n`,
-            { text: 'Employee ID: ', bold: true },
-            `${user.employeeId || 'N/A'}\n`,
             { text: 'Position Title: ', bold: true },
             `${user.professionalInfo?.position || 'N/A'}\n`,
             { text: 'Department: ', bold: true },
