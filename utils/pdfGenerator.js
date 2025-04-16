@@ -727,9 +727,251 @@ const generateWorkTransferRequest = async (user, request) => {
   }
 };
 
+const generatePayslipRequest = async (user, request) => {
+  try {
+    console.log("request",request);
+    const docDefinition = {
+      pageOrientation: 'portrait',
+      pageMargins: [40, 120, 40, 60],
+      header: {
+        columns: [
+          { 
+            image: 'logo.jpeg',
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            text: [
+              { text: 'PAYSLIP\n', style: 'headerTitle' },
+              { 
+                text: [
+                  { text: 'Payment Period: ', bold: true },
+                  `${new Date(request.paydetails.periodStart).toLocaleDateString()} - `,
+                  `${new Date(request.paydetails.periodEnd).toLocaleDateString()}\n`,
+                  { text: 'Issued: ', bold: true },
+                  new Date().toLocaleDateString()
+                ],
+                style: 'headerDetails'
+              }
+            ],
+            margin: [20, 25, 0, 0]
+          }
+        ]
+      },
+      content: [
+        { text: 'EMPLOYEE PAYSLIP', style: 'documentTitle' },
+        { text: '\n' },
+    
+        // Employee Information Section
+        {
+          text: [
+            { text: 'Employee Information\n', style: 'sectionTitle' },
+            { text: 'Name: ', bold: true }, 
+            `${user.firstName} ${user.lastName}\n`,
+            { text: 'Position: ', bold: true }, 
+            `${user.professionalInfo?.position || 'N/A'}\n\n`,
+            
+            { text: 'Bank Details\n', style: 'subsectionHeader' },
+            { text: 'Account Number: ', bold: true }, 
+            `${user.financialInfo?.bankAccount || 'N/A'}\n`,
+            { text: 'Tax Identification: ', bold: true }, 
+            `${user.financialInfo?.taxId || 'N/A'}\n`
+          ],
+          style: 'employeeInfo'
+        },
+        { text: '\n' },
+    
+        // Compensation Breakdown
+        {
+          text: [
+            { text: 'Compensation Breakdown\n', style: 'sectionTitle' },
+            
+            { text: 'Earnings\n', style: 'subsectionHeader' },
+            `• Base Salary: ${formatCurrency(request.paydetails.basicSalary)}\n`,
+            `• Allowances: ${formatCurrency(request.paydetails.allowances)}\n`,
+            `• Overtime: ${formatCurrency(request.paydetails.overtime)}\n`,
+            { 
+              text: `Total Earnings: ${formatCurrency(request.paydetails.totalEarnings)}\n\n`,
+              style: 'totalAmount'
+            },
+            
+            { text: 'Deductions\n', style: 'subsectionHeader' },
+            `• Tax Withheld: ${formatCurrency(request.paydetails.tax)}\n`,
+            `• Insurance Premiums: ${formatCurrency(request.paydetails.insurance)}\n`,
+            `• Other Deductions: ${formatCurrency(request.paydetails.otherDeductions)}\n`,
+            { 
+              text: `Total Deductions: ${formatCurrency(request.paydetails.totalDeductions)}\n\n`,
+              style: 'totalAmount'
+            },
+            
+            { text: 'Net Payable Amount\n', style: 'subsectionHeader' },
+            { 
+              text: formatCurrency(request.paydetails.netPay),
+              style: 'netPay'
+            }
+          ],
+          style: 'compensationDetails'
+        },
+        { text: '\n' },
+    
+        // Footer
+        {
+          text: [
+            { text: 'Important Notes:\n', style: 'footerHeader' },
+            { 
+              text: `• This is an electronically generated document requiring no signature\n`,
+              italics: true
+            },
+            { 
+              text: `• Valid only when verified through ${process.env.COMPANY_NAME} HR system\n`,
+              italics: true
+            },
+            { 
+              text: `• Issued on ${new Date().toLocaleDateString()}`,
+              italics: true
+            }
+          ],
+          style: 'footerText'
+        }
+      ],
+      styles: {
+        headerTitle: {
+          fontSize: 18,
+          bold: true,
+          color: '#2c3e50'
+        },
+        headerDetails: {
+          fontSize: 10,
+          color: '#666',
+          lineHeight: 1.3
+        },
+        documentTitle: {
+          fontSize: 16,
+          bold: true,
+          color: '#1a365d',
+          alignment: 'center',
+          margin: [0, 0, 0, 10]
+        },
+        sectionTitle: {
+          fontSize: 14,
+          bold: true,
+          color: '#ffffff',
+          background: '#2c3e50',
+          margin: [0, 5, 0, 10],
+          padding: [8, 5],
+          borderRadius: 3
+        },
+        employeeInfo: {
+          fontSize: 12,
+          lineHeight: 1.6,
+          margin: [0, 0, 0, 15]
+        },
+        subsectionHeader: {
+          fontSize: 12,
+          bold: true,
+          color: '#2c3e50',
+          margin: [0, 10, 0, 5]
+        },
+        totalAmount: {
+          bold: true,
+          color: '#1a365d'
+        },
+        netPay: {
+          fontSize: 16,
+          bold: true,
+          color: '#1a365d',
+          background: '#f0f4f8',
+          padding: [8, 5],
+          borderRadius: 3
+        },
+        footerText: {
+          fontSize: 10,
+          color: '#666',
+          lineHeight: 1.4
+        },
+        footerHeader: {
+          bold: true,
+          color: '#2c3e50',
+          margin: [0, 0, 0, 5]
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 12,
+        lineHeight: 1.4
+      }
+    };
+
+    // PDF generation and email code similar to work transfer function
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      pdfDoc.on('data', chunk => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME} Payroll Department" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: `Payslip - ${new Date(request.paydetails.periodStart).toLocaleDateString()} to ${new Date(request.paydetails.periodEnd).toLocaleDateString()}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color: #2c3e50;">Payslip Attached</h2>
+          <p>Dear ${user.firstName},</p>
+          <p>Please find attached your payslip for the period ${new Date(request.paydetails.periodStart).toLocaleDateString()} - ${new Date(request.paydetails.periodEnd).toLocaleDateString()}.</p>
+          <p><strong>Payment Summary:</strong></p>
+          <ul>
+            <li>Net Pay: ${formatCurrency(request.paydetails.netPay)}</li>
+            <li>Payment Date: ${new Date().toLocaleDateString()}</li>
+          </ul>
+          <hr style="border: 1px solid #eee; margin: 20px 0;">
+          <p style="font-size: 0.9em; color: #666;">
+            ${process.env.COMPANY_NAME}<br>
+            ${process.env.COMPANY_ADDRESS}<br>
+            Payroll Department: <a href="mailto:${process.env.PAYROLL_EMAIL}">${process.env.PAYROLL_EMAIL}</a>
+          </p>
+        </div>
+      `,
+      attachments: [{
+        filename: `Payslip-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      documentData: {
+        type: 'Payslip',
+        periodStart: request.paydetails.periodStart,
+        periodEnd: request.paydetails.periodEnd,
+        netPay: request.paydetails.netPay,
+        recipient: user.email
+      },
+      emailSent: true
+    };
+
+  } catch (error) {
+    console.error('Payslip generation failed:', error);
+    throw error;
+  }
+};
+
+// Helper function
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'TND',
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3
+  }).format(amount);
+};
 function calculateYearsOfService(hireDate) {
   const diff = new Date() - new Date(hireDate);
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
 }
 
-module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest };
+module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest };

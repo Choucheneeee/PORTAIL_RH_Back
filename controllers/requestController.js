@@ -2,7 +2,7 @@ const Request = require("../models/requests.model");
 const Document = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
-const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest } = require("../utils/pdfGenerator");
+const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest } = require("../utils/pdfGenerator");
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate) {
   let count = 0;
@@ -74,6 +74,25 @@ exports.createRequest = async (req, res) => {
       };
     } 
     // Handle other document types
+    if (documentType === 'Payslip') {
+      console.log("req.body",req.body)
+      const { allowances, basicSalary, insurance, otherDeductions,overtime,periodEnd,periodStart,tax } = req.body.paydetails;
+      
+      if (!allowances || !basicSalary || !insurance || !otherDeductions|| !overtime || !periodEnd|| ! periodStart || !tax) {
+        return res.status(400).json({ error: "All work transfer fields are required" });
+      }
+
+      requestData.paydetails = {
+        allowances,
+        basicSalary,
+        insurance,
+        otherDeductions,
+        overtime,
+        periodEnd: new Date(periodEnd),
+        periodStart: new Date(periodStart),
+        tax
+      };
+    } 
 
 
     // Handle Leave & Time-Off Requests
@@ -129,7 +148,7 @@ exports.createRequest = async (req, res) => {
         });
       }
     }
-
+    
     const newRequest = new Request(requestData);
     await newRequest.save();
 
@@ -186,9 +205,14 @@ exports.updateRequest = async (req, res) => {
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
     }
+    const user = await User.findById(request.user);
+    if (request.documentType === 'Payslip') {
+      if (request.paydetails.tax > request.paydetails.totalEarnings * 0.4) {
+        return res.status(404).json({ error: "Handle unreasonable tax rate" });
+      }
+    }
 
     if (request.requestType === 'Leave & Time-Off Requests') {
-      const user = await User.findById(request.user);
       
       // Original time-off balance logic
       if (status === 'Accepted' && request.status !== 'Accepted') {
@@ -204,35 +228,93 @@ exports.updateRequest = async (req, res) => {
         await user.save();
       }
     }
-    else if (request.requestType === 'Employment & Work Documents' && status === 'Accepted') {
-      const user = await User.findById(request.user);
-      let docData;
-
-      switch(request.documentType) {
-        case 'Employment Certificate':
-          docData = await generateEmploymentCertificate(user, request);
-          break;
-        case 'Job Description':
-          docData = await generateJobDescriptionCertificate(user, request);
-          break;
-        case 'Work Transfer Request':
-          docData = await generateWorkTransferRequest(user, request);
-          break;
-        default:
-          throw new Error('Invalid document type');
+    else{
+      if (status === 'Accepted') {
+        switch(request.requestType) {
+          case 'Employment & Work Documents':
+            switch(request.documentType) {
+              case 'Employment Certificate':
+                docData = await generateEmploymentCertificate(user, request);
+                break;
+              case 'Job Description':
+                docData = await generateJobDescriptionCertificate(user, request);
+                break;
+              case 'Work Transfer Request':
+                docData = await generateWorkTransferRequest(user, request);
+                break;
+              default:
+                throw new Error(`Invalid document type for Employment & Work Documents: ${request.documentType}`);
+            }
+            break;
+  
+          case 'Payroll & Financial Documents':
+            switch(request.documentType) {
+              case 'Payslip':
+                docData = await generatePayslipRequest(user, request);
+                break;
+              case 'Salary Certificate':
+                docData = await generateSalaryCertificate(user, request);
+                break;
+              case 'Tax Certificate':
+                docData = await generateTaxCertificate(user, request);
+                break;
+              default:
+                throw new Error(`Invalid document type for Payroll & Financial Documents: ${request.documentType}`);
+            }
+            break;
+            case 'Leave & Time-Off Requests':
+            switch(request.documentType) {
+              case 'Paid Leave Request':
+                // docData = await generatePayslipRequest(user, request);
+                break;
+              case 'Sick Leave Request':
+                // docData = await generateSalaryCertificate(user, request);
+                break;
+              case 'Maternity/Paternity Leave':
+                // docData = await generateTaxCertificate(user, request);
+                break;
+              default:
+                throw new Error(`Invalid document type for Payroll & Financial Documents: ${request.documentType}`);
+            }
+            break;
+  
+          case 'HR & Administrative Requests':
+            switch(request.documentType) {
+              case 'Reference Letter':
+                docData = await generateReferenceLetter(user, request);
+                break;
+              case 'Resignation Request':
+                docData = await generateResignationDocument(user, request);
+                break;
+              case 'ID Badge Replacement':
+                docData = await generateIDBadgeDocument(user, request);
+                break;
+              default:
+                throw new Error(`Invalid document type for HR & Administrative Requests: ${request.documentType}`);
+            }
+            break;
+  
+          default:
+            throw new Error(`Document generation not supported for request type: ${request.requestType}`);
+        }
+  
+        if (docData) {
+          const document = new Document({
+            ...docData,
+            type: request.documentType,
+            generatedFor: request._id,
+            generatedBy: req.user.id,
+            accessRoles: ['employee', 'hr', 'manager']
+          });
+          await document.save();
+          request.document = document._id;
+        }
       }
 
-      const document = new Document({
-        ...docData,
-        type: request.documentType, // Set from request
-        generatedFor: request._id,
-        generatedBy: req.user.id,
-        accessRoles: ['employee', 'hr', 'manager']
-      });
-
-      await document.save();
-      request.document = document._id;
     }
+    
+    
+
 
     
 
@@ -244,7 +326,6 @@ exports.updateRequest = async (req, res) => {
     );
 
     // Notification logic
-    const user = await User.findById(request.user);
     if (user) {
       await sendUserNotification(
         user.email,
