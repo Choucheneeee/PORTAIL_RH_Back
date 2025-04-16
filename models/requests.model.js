@@ -53,9 +53,9 @@ const requestSchema = new mongoose.Schema({
       effectiveDate: Date,
       reason: String
     },
-    required: function() {
-      return this.documentType === 'Work Transfer Request';
-    }
+    // required: function() {
+    //   return this.documentType === 'Work Transfer Request';
+    // }
   },
   status: { type: String, enum: ["Pending", "Accepted", "Declined"], default: "Pending" },
   requestDetails: String,
