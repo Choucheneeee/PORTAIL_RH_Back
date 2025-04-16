@@ -467,6 +467,7 @@ const generateJobDescriptionCertificate = async (user, request) => {
 
 const generateWorkTransferRequest = async (user, request) => {
   try {
+    console.log("request",request);
     const docDefinition = {
       pageOrientation: 'portrait',
       pageMargins: [40, 120, 40, 60],

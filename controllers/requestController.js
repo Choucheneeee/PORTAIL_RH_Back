@@ -66,7 +66,7 @@ exports.createRequest = async (req, res) => {
         return res.status(400).json({ error: "All work transfer fields are required" });
       }
 
-      req.body.details = {
+      requestData.details = {
         newDepartment,
         newPosition,
         effectiveDate: new Date(effectiveDate),
@@ -74,9 +74,7 @@ exports.createRequest = async (req, res) => {
       };
     } 
     // Handle other document types
-    else {
-      req.body.details = null;
-    }
+
 
     // Handle Leave & Time-Off Requests
     if (requestType === 'Leave & Time-Off Requests') {
