@@ -46,6 +46,17 @@ const requestSchema = new mongoose.Schema({
       message: props => `"${props.value}" is not a valid document type for ${props.instance.type}`
     }
   },
+  details: {
+    type: {
+      newDepartment: String,
+      newPosition: String,
+      effectiveDate: Date,
+      reason: String
+    },
+    required: function() {
+      return this.documentType === 'Work Transfer Request';
+    }
+  },
   status: { type: String, enum: ["Pending", "Accepted", "Declined"], default: "Pending" },
   requestDetails: String,
   startDate: { type: Date }, // Only for leave requests

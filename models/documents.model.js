@@ -6,10 +6,18 @@ const documentSchema = new mongoose.Schema({
     required: true,
     enum: [
       "Employment Certificate",
-      "Payslip",
-      "Tax Certificate",
-      "Reference Letter",
-      "Other"
+            "Job Description",
+            "Work Transfer Request",
+            "Payslip",
+            "Salary Certificate",
+            "Tax Certificate",
+            "Paid Leave Request",
+            "Sick Leave Request",
+            "Maternity/Paternity Leave",
+            "Reference Letter",
+            "Resignation Request",
+            "ID Badge Replacement"
+
     ]
   },
   generatedFor: { 

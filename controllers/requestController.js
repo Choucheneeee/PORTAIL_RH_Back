@@ -2,7 +2,7 @@ const Request = require("../models/requests.model");
 const Document = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
-const { generateEmploymentCertificate } = require("../utils/pdfGenerator");
+const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest } = require("../utils/pdfGenerator");
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate) {
   let count = 0;
@@ -47,17 +47,38 @@ exports.createRequest = async (req, res) => {
       return res.status(400).json({ error: `"${documentType}" is not a valid document type for "${requestType}".` });
     }
 
-    // Handle time-off specific logic
+    // Base request data
     const requestData = {
       user: userId,
       firstName: user.firstName,
       lastName: user.lastName,
       requestType,
       documentType,
-      requestDetails,
-      status: 'Pending'
+      status: 'Pending',
+      requestDetails: requestDetails
     };
 
+    // Handle Work Transfer Request specifically
+    if (documentType === 'Work Transfer Request') {
+      const { newDepartment, newPosition, effectiveDate, transferReason } = req.body;
+      
+      if (!newDepartment || !newPosition || !effectiveDate || !transferReason) {
+        return res.status(400).json({ error: "All work transfer fields are required" });
+      }
+
+      requestData.details = {
+        newDepartment,
+        newPosition,
+        effectiveDate: new Date(effectiveDate),
+        reason: transferReason
+      };
+    } 
+    // Handle other document types
+    else {
+      requestData.details = requestDetails;
+    }
+
+    // Handle Leave & Time-Off Requests
     if (requestType === 'Leave & Time-Off Requests') {
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "Start and end dates are required for time-off requests" });
@@ -65,14 +86,10 @@ exports.createRequest = async (req, res) => {
 
       const start = new Date(startDate);
       const end = new Date(endDate);
+      const today = new Date().setHours(0,0,0,0);
 
-      if (start < new Date().setHours(0,0,0,0)) {
+      if (start < today) {
         return res.status(400).json({ error: "Start date cannot be in the past" });
-      }
-      
-      // Maximum consecutive days limit
-      if (numberOfDays > 14) {
-        return res.status(400).json({ error: "Maximum 14 consecutive days allowed" });
       }
 
       if (start >= end) {
@@ -88,37 +105,33 @@ exports.createRequest = async (req, res) => {
         return res.status(400).json({ error: "Insufficient time off balance" });
       }
 
+      // Add leave-specific fields
       requestData.startDate = start;
       requestData.endDate = end;
       requestData.numberOfDays = numberOfDays;
     }
 
+    // Handle Employment & Work Documents validation
     if (requestType === "Employment & Work Documents") {
-      // Validate required professional info
       if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
         return res.status(400).json({ 
           error: "User professional information is required for this request" 
         });
       }
-    
-      // Employment Certificate specific validation
-      if (documentType === "Employment Certificate") {
-        if (!user.professionalInfo.hiringDate) {
-          return res.status(400).json({
-            error: "Hiring date is required for employment certificate"
-          });
-        }
+
+      if (documentType === "Employment Certificate" && !user.professionalInfo.hiringDate) {
+        return res.status(400).json({
+          error: "Hiring date is required for employment certificate"
+        });
       }
-    
-      // Job Description validation
-      if (documentType === "Job Description") {
-        if (!user.professionalInfo.jobDescription) {
-          return res.status(400).json({
-            error: "Job description details not found"
-          });
-        }
+
+      if (documentType === "Job Description" && !user.professionalInfo.jobDescription) {
+        return res.status(400).json({
+          error: "Job description details not found"
+        });
       }
     }
+
     const newRequest = new Request(requestData);
     await newRequest.save();
 
@@ -195,20 +208,36 @@ exports.updateRequest = async (req, res) => {
     }
     else if (request.requestType === 'Employment & Work Documents' && status === 'Accepted') {
       const user = await User.findById(request.user);
-      const docData = await generateEmploymentCertificate(user, request);
-      
+      let docData;
+
+      switch(request.documentType) {
+        case 'Employment Certificate':
+          docData = await generateEmploymentCertificate(user, request);
+          break;
+        case 'Job Description':
+          docData = await generateJobDescriptionCertificate(user, request);
+          break;
+        case 'Work Transfer Request':
+          docData = await generateWorkTransferRequest(user, request);
+          break;
+        default:
+          throw new Error('Invalid document type');
+      }
+
       const document = new Document({
         ...docData,
-        type: 'Employment Certificate', // Explicitly set required field
-
+        type: request.documentType, // Set from request
         generatedFor: request._id,
         generatedBy: req.user.id,
-        accessRoles: ['employee', 'hr']
+        accessRoles: ['employee', 'hr', 'manager']
       });
 
       await document.save();
       request.document = document._id;
     }
+
+    
+
 
     const updatedRequest = await Request.findByIdAndUpdate(
       id,

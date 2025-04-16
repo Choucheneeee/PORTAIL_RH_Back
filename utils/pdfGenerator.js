@@ -21,92 +21,147 @@ const transporter = nodemailer.createTransport({
 
 const generateEmploymentCertificate = async (user, request) => {
   try {
-    // Professional PDF Content
     const docDefinition = {
+      pageMargins: [40, 120, 40, 80],
       header: {
         columns: [
-          { text: 'OFFICIAL EMPLOYMENT CERTIFICATE', style: 'companyHeader' }
+          { 
+            image: 'logo.jpeg',
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          {
+            stack: [
+              { text: process.env.COMPANY_NAME, style: 'companyName' },
+              { text: 'Certificate of Employment', style: 'companySubheader' },
+              { text: process.env.COMPANY_ADDRESS, style: 'companyAddress' }
+            ],
+            margin: [20, 25, 0, 0]
+          }
         ]
       },
       content: [
-        { text: 'EMPLOYMENT VERIFICATION', style: 'documentTitle' },
+        { text: 'OFFICIAL EMPLOYMENT VERIFICATION', style: 'documentTitle' },
         { text: '\n' },
         {
           text: [
-            { text: 'Employee Name: ', bold: true },
-            `${user.firstName || 'N/A'} ${user.lastName || 'N/A'}\n`,
-            { text: 'Position Title: ', bold: true },
-            `${user.professionalInfo?.position || 'N/A'}\n`,
-            { text: 'Department: ', bold: true },
-            `${user.professionalInfo?.department || 'N/A'}\n`,
-            { text: 'Employment Start Date: ', bold: true },
-            `${user.professionalInfo?.hiringDate?.toLocaleDateString() || 'N/A'}\n`,
-            { text: 'Employment Status: ', bold: true },
-            'Active'
+            { text: `${new Date().toLocaleDateString()}\n`, style: 'documentDate' },
+            { text: 'To Whom It May Concern:\n\n', style: 'salutation' },
+            
+            `This is to certify that `,{text:`${user.firstName} ${user.lastName}`, bold: true}, ,
+            `is duly employed with ${process.env.COMPANY_NAME} in the capacity of `,
+            { text: `${user.professionalInfo?.position || 'their current position'}, `, bold: true },
+            `assigned to the ${user.professionalInfo?.department || 'specified'} department.\n\n`,
+            
+            `Mr./Ms. ${user.lastName}  commenced employment with our organization on `,
+            { text: `${user.professionalInfo?.hiringDate?.toLocaleDateString() || '[start date]'}, `, bold: true },
+            `and has maintained an ${'Active'} employment status since that time. `,
+            `This verification is issued upon the employee's formal request for official purposes.\n\n`,
+            
+            { text: 'Position Details:\n', style: 'sectionHeader' },
+            `• Current Position: ${user.professionalInfo?.position || 'N/A'}\n`,
+            `• Department: ${user.professionalInfo?.department || 'N/A'}\n`,
+            `• Employment Type: Full-time Regular\n`,
+            `• Reporting Structure: ${process.env.COMPANY_NAME} Organizational Hierarchy\n\n`,
+            
+            { text: 'Certification Statement:\n', style: 'sectionHeader' },
+            `This document serves as official confirmation of employment status and may be used for `,
+            `verification purposes with financial institutions, government agencies, or other entities `,
+            `requiring proof of employment. The information contained herein is accurate as of the `,
+            `date of issuance and remains valid unless otherwise superseded.\n\n`,
+            
+            { text: 'Authorization & Verification:\n', style: 'sectionHeader' },
+            `This certificate bears the official digital signature of ${process.env.COMPANY_NAME} `,
+            `and includes a unique QR code containing encrypted employment verification details.`
           ],
-          style: 'employeeDetails'
+          style: 'mainContent'
         },
         { text: '\n' },
-        {
-          text: [
-            'This is to certify that ',
-            { text: `${user.firstName} ${user.lastName} `, bold: true },
-            'is a bona fide employee of ',
-            { text: process.env.COMPANY_NAME, bold: true },
-            '. This certificate is issued at the employee\'s request and is valid for official purposes only.'
-          ],
-          style: 'bodyText'
-        },
-        { text: '\n\n' },
         {
           columns: [
-            { qr: `Employee ID: ${user.employeeId}`, fit: 100 },
-            { 
+            {
               text: [
-                { text: 'Authorized Signature:\n', bold: true },
-                '[Digital Signature]\n',
-                { text: `Date: ${new Date().toLocaleDateString()}`, italics: true }
-              ], 
-              alignment: 'right' 
-            }
-          ]
+                { text: 'Authorized Signature\n', style: 'signatureLabel' },
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                `${process.env.HR_MANAGER_NAME || 'HR Director'}\n`,
+                `${process.env.COMPANY_NAME}`
+              ],
+              width: '*'
+            },
+          ],
+          margin: [0, 20, 0, 0]
         }
       ],
-      footer: function(currentPage, pageCount) {
-        return {
-          columns: [
-            { text: `Confidential Document - ${process.env.COMPANY_NAME}`, alignment: 'left', fontSize: 8 },
-            { text: `Page ${currentPage} of ${pageCount}`, alignment: 'right', fontSize: 8 }
-          ],
-          margin: [40, 20]
-        };
+      footer: {
+        columns: [
+          { 
+            text: `CONFIDENTIAL DOCUMENT | ${process.env.COMPANY_PHONE} | ${process.env.HR_EMAIL}`, 
+            fontSize: 8,
+            color: '#666666'
+          },
+          { 
+            text: `Valid through ${new Date().getFullYear()} | Page {{page}} of {{pages}}`, 
+            fontSize: 8,
+            alignment: 'right'
+          }
+        ],
+        margin: [40, 20]
       },
       styles: {
-        documentTitle: {
+        companyName: {
           fontSize: 16,
           bold: true,
-          alignment: 'center',
-          margin: [0, 20, 0, 10]
+          color: '#2c3e50'
         },
-        companyHeader: {
+        companySubheader: {
           fontSize: 14,
+          color: '#4a4a4a',
+          margin: [0, 2, 0, 0]
+        },
+        companyAddress: {
+          fontSize: 10,
+          color: '#666666',
+          margin: [0, 5, 0, 0]
+        },
+        documentTitle: {
+          fontSize: 18,
           bold: true,
+          color: '#1a237e',
+          alignment: 'center',
+          margin: [0, 10, 0, 15]
+        },
+        documentDate: {
+          fontSize: 12,
+          color: '#666666',
+          alignment: 'right'
+        },
+        salutation: {
+          fontSize: 12,
+          color: '#333333',
+          margin: [0, 0, 0, 10]
+        },
+        sectionHeader: {
+          fontSize: 13,
+          bold: true,
+          color: '#1a237e',
+          margin: [0, 10, 0, 5]
+        },
+        mainContent: {
+          fontSize: 12,
+          color: '#444444',
+          lineHeight: 1.6,
+          margin: [0, 0, 0, 10]
+        },
+        signatureLabel: {
+          fontSize: 11,
           color: '#2c3e50',
-          margin: [20, 25, 0, 0]
-        },
-        employeeDetails: {
-          fontSize: 12,
-          lineHeight: 1.5,
-          margin: [0, 10, 0, 10]
-        },
-        bodyText: {
-          fontSize: 12,
-          lineHeight: 1.5,
-          margin: [0, 10, 0, 10]
+          bold: true,
+          margin: [0, 0, 0, 5]
         }
       },
       defaultStyle: {
-        font: 'Roboto'
+        font: 'Roboto',
+        lineHeight: 1.4
       }
     };
 
@@ -169,5 +224,511 @@ const generateEmploymentCertificate = async (user, request) => {
     throw error;
   }
 };
+const generateJobDescriptionCertificate = async (user, request) => {
+  try {
+    const docDefinition = {
+      pageMargins: [40, 140, 40, 80],
+      header: {
+        columns: [
+          { 
+            image: 'logo.jpeg',
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            stack: [
+              { text: process.env.COMPANY_NAME, style: 'companyName' },
+              { text: 'OFFICIAL JOB DESCRIPTION', style: 'companyHeader' }
+            ],
+            margin: [20, 25, 0, 0]
+          }
+        ]
+      },
+      content: [
+        { text: 'POSITION DESCRIPTION DOCUMENT', style: 'documentTitle' },
+        { text: '\n' },
+        {
+          stack: [
+            // Employee Information Section
+            {
+              text: 'EMPLOYEE INFORMATION',
+              style: 'sectionHeader',
+              margin: [0, 0, 0, 10]
+            },
+            {
+              text: [
+                { text: 'Full Name: ', style: 'fieldLabel' },
+                `${user.firstName} ${user.lastName}\n`,
+                { text: 'Position Title: ', style: 'fieldLabel' },
+                `${user.professionalInfo?.position || 'Not Specified'}\n`,
+                { text: 'Department: ', style: 'fieldLabel' },
+                `${user.professionalInfo?.department || 'Not Specified'}\n`,
+                { text: 'Effective Date: ', style: 'fieldLabel' },
+                `${user.professionalInfo?.jobDescription?.effectiveDate?.toLocaleDateString() || new Date().toLocaleDateString()}`
+              ],
+              style: 'fieldContent'
+            },
 
-module.exports = { generateEmploymentCertificate };
+            // Position Summary
+            {
+              text: 'POSITION SUMMARY',
+              style: 'sectionHeader',
+              margin: [0, 20, 0, 10]
+            },
+            {
+              text: [
+                `The ${user.professionalInfo?.position || 'this position'} role within `,
+                { text: `${process.env.COMPANY_NAME}'s `, bold: true },
+                `${user.professionalInfo?.department || 'specified department'} department `,
+                `requires a professional with demonstrated expertise in their field. `,
+                `This position entails the following key responsibilities and requirements:`
+              ],
+              style: 'paragraph'
+            },
+
+            // Key Responsibilities
+            {
+              text: 'KEY RESPONSIBILITIES',
+              style: 'sectionHeader',
+              margin: [0, 20, 0, 10]
+            },
+            {
+              ul: (user.professionalInfo?.jobDescription?.responsibilities || ['Not specified'])
+                .map(r => ({ text: r, style: 'listItem' })),
+              style: 'listContainer'
+            },
+
+            // Required Qualifications
+            {
+              text: 'REQUIRED QUALIFICATIONS',
+              style: 'sectionHeader',
+              margin: [0, 20, 0, 10]
+            },
+            {
+              ul: (user.professionalInfo?.jobDescription?.qualifications || ['Not specified'])
+                .map(q => ({ text: q, style: 'listItem' })),
+              style: 'listContainer'
+            },
+
+          ]
+        }
+      ],
+      footer: {
+        columns: [
+          { 
+            text: `CONFIDENTIAL DOCUMENT | ${process.env.COMPANY_ADDRESS} | ${process.env.COMPANY_PHONE}`, 
+            fontSize: 8,
+            color: '#666666',
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            text: `Valid through ${new Date().getFullYear()} | Page 1 of 1`, 
+            fontSize: 8,
+            alignment: 'right',
+            margin: [0, 20, 40, 0]
+          }
+        ]
+      },
+      styles: {
+        companyName: {
+          fontSize: 14,
+          color: '#333333',
+          bold: true,
+          margin: [0, 0, 0, 2]
+        },
+        documentTitle: {
+          fontSize: 20,
+          bold: true,
+          color: '#2c3e50',
+          alignment: 'center',
+          margin: [0, 0, 0, 15]
+        },
+        sectionHeader: {
+          fontSize: 14,
+          bold: true,
+          color: '#2c3e50',
+          border: [false, false, false, true],
+          borderColor: '#2c3e50',
+          borderWidth: 1,
+          padding: [0, 0, 5, 5]
+        },
+        fieldLabel: {
+          bold: true,
+          color: '#4a4a4a',
+          fontSize: 12,
+          margin: [0, 3, 0, 3]
+        },
+        fieldContent: {
+          fontSize: 12,
+          color: '#333333',
+          lineHeight: 1.5,
+          margin: [0, 0, 0, 15]
+        },
+        paragraph: {
+          fontSize: 12,
+          color: '#444444',
+          lineHeight: 1.6,
+          margin: [0, 0, 0, 15]
+        },
+        listContainer: {
+          margin: [20, 5, 0, 15]
+        },
+        listItem: {
+          fontSize: 12,
+          color: '#444444',
+          lineHeight: 1.5,
+          markerColor: '#2c3e50'
+        },
+        signatureLabel: {
+          bold: true,
+          color: '#2c3e50',
+          fontSize: 11,
+          margin: [0, 0, 0, 5]
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        lineHeight: 1.4
+      }
+    };
+
+
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      pdfDoc.on('data', chunk => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+
+    // Professional Email Template
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      cc: process.env.HR_EMAIL,
+      subject: `Official Job Description - ${user.firstName} ${user.lastName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
+          <div style="border-bottom: 2px solid #2c3e50; padding-bottom: 15px; margin-bottom: 25px;">
+            <img src="${process.env.COMPANY_LOGO_URL}" alt="Company Logo" style="max-height: 50px;">
+          </div>
+          <h2 style="color: #2c3e50; margin-bottom: 20px;">Job Description Document</h2>
+          <p>Dear ${user.firstName},</p>
+          <p>Please find attached your official job description document as requested.</p>
+          
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p style="margin: 0;"><strong>Document Details:</strong></p>
+            <ul style="margin: 10px 0 0 20px;">
+              <li>Document Type: Position Description</li>
+              <li>Effective Date: ${new Date().toLocaleDateString()}</li>
+              <li>Reference Number: JD-${request._id.toString().slice(-8).toUpperCase()}</li>
+            </ul>
+          </div>
+
+          <p style="color: #666; font-size: 0.9em;">
+            <strong>Important:</strong> This document contains confidential employment information. 
+            Please ensure proper handling and storage according to company policies.
+          </p>
+
+          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee;">
+            <p style="font-size: 0.9em; color: #666; margin: 5px 0;">
+              ${process.env.COMPANY_NAME}<br>
+              ${process.env.COMPANY_ADDRESS}<br>
+              HR Department: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
+            </p>
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: `Job-Description-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      documentData: {
+        type: 'Job Description',
+        referenceNumber: `JD-${request._id.toString().slice(-8).toUpperCase()}`,
+        effectiveDate: new Date(),
+        recipient: user.email
+      },
+      emailSent: true
+    };
+
+  } catch (error) {
+    console.error('Professional document generation failed:', error);
+    throw error;
+  }
+};
+
+const generateWorkTransferRequest = async (user, request) => {
+  try {
+    const docDefinition = {
+      pageOrientation: 'portrait',
+      pageMargins: [40, 120, 40, 60],
+      header: {
+        columns: [
+          { 
+            image: 'logo.jpeg', // Add actual logo buffer or remove
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            text: [
+              { text: 'New Position: ', bold: true },
+              `${request.details.newPosition || 'N/A'}\n\n`,
+              { text: 'New Department: ', bold: true },
+              `${request.details.newDepartment || 'N/A'}\n\n`,
+              { text: 'Effective Date: ', bold: true },
+              `${new Date(request.details.effectiveDate).toLocaleDateString() || 'N/A'}\n\n`,
+              { text: 'Transfer Reason: ', bold: true },
+              `${request.details.reason || 'Not specified'}`
+            ],
+            style: 'employeeDetails',
+            margin: [20, 25, 0, 0]
+          }
+        ]
+      },
+      content: [
+        { 
+          text: 'EMPLOYEE WORK TRANSFER AUTHORIZATION', 
+          style: 'documentTitle',
+          margin: [0, 0, 0, 15]
+        },
+        {
+          text: 'This document serves as official authorization for the permanent transfer of employment within the organization, outlining the terms and conditions governing this transition. The transfer is subject to organizational policies and any applicable collective bargaining agreements.',
+          style: 'preambleText'
+        },
+        { text: '\n' },
+        {
+          style: 'sectionHeader',
+          table: {
+            widths: ['*'],
+            body: [
+              [{ text: '1. Employee Information', style: 'sectionHeaderText' }]
+            ]
+          }
+        },
+        {
+          text: [
+            { text: 'Employee Name: ', bold: true },
+            `${user.firstName || 'N/A'} ${user.lastName || 'N/A'}\n`,
+
+            { text: 'Current Position: ', bold: true },
+            `${user.professionalInfo?.position || 'N/A'}\n`,
+            { text: 'Years of Service: ', bold: true },
+            `${calculateYearsOfService(user.professionalInfo.hiringDate)} years\n`,
+          ],
+          style: 'employeeDetails'
+        },
+        {
+          style: 'sectionHeader',
+          table: {
+            widths: ['*'],
+            body: [
+              [{ text: '2. Transfer Details', style: 'sectionHeaderText' }]
+            ]
+          }
+        },
+        {
+          text: [
+            `Effective ${new Date(request.updatedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, `,
+            { text: `${user.firstName} ${user.lastName} `, bold: true },
+            `will be transferred from the current assignment in the `,
+            { text: `${user.professionalInfo?.department || 'current department'}, `, bold: true },
+            `to the new position within the `,
+            { text: `${request.details.newDepartment || 'new department'}. `, bold: true },
+            `This transfer constitutes a permanent reassignment of duties and responsibilities as outlined in the attached position description.`
+          ],
+          style: 'bodyText'
+        },
+        {
+          text: [
+            { text: '\nTransfer Rationale: ', bold: true, italics: true },
+            `${request.details.reason || 'Organizational needs require workforce realignment to better serve operational requirements.'} `,
+            `
+            This transfer has been approved through proper organizational channels and complies with all relevant labor regulations.`
+          ],
+          style: 'bodyText'
+        },
+        {
+          style: 'sectionHeader',
+          table: {
+            widths: ['*'],
+            body: [
+              [{ text: '3. Authorization & Acknowledgements', style: 'sectionHeaderText' }]
+            ]
+          }
+        },
+        {
+          text: [
+            'By signing below, all parties acknowledge understanding and acceptance of this transfer arrangement. The employee affirms commitment to a smooth transition, including proper handover of responsibilities and participation in any required orientation activities.\n\n',
+            '__________________________________________\n',
+            { text: 'Employee Signature', italics: true, fontSize: 10 }, '\n\n',
+            '__________________________________________\n',
+            { text: 'HR Representative Signature', italics: true, fontSize: 10 }, '\n\n',
+            '__________________________________________\n',
+            { text: 'Department Head Authorization', italics: true, fontSize: 10 }
+          ],
+          style: 'signatureBlock'
+        },
+        {
+          text: '*This document becomes valid only when all required signatures are complete and verified by Human Resources.',
+          style: 'disclaimerText'
+        }
+      ],
+      footer: function(currentPage, pageCount) {
+        return {
+          columns: [
+            { 
+              text: `CONFIDENTIAL - ${process.env.COMPANY_NAME} INTERNAL USE ONLY`, 
+              alignment: 'left', 
+              fontSize: 8,
+              color: '#666'
+            },
+            { 
+              text: `Page ${currentPage} of ${pageCount} | Issued: ${new Date().toLocaleDateString()}`, 
+              alignment: 'right', 
+              fontSize: 8,
+              color: '#666'
+            }
+          ],
+          margin: [40, 20]
+        };
+      },
+      styles: {
+        documentTitle: {
+          fontSize: 18,
+          bold: true,
+          alignment: 'center',
+          color: '#1a365d',
+          margin: [0, 10, 0, 5]
+        },
+        companyHeader: {
+          fontSize: 16,
+          bold: true,
+          color: '#2c3e50'
+        },
+        documentSubHeader: {
+          fontSize: 14,
+          color: '#4a5568',
+          margin: [0, 5, 0, 5]
+        },
+        departmentHeader: {
+          fontSize: 12,
+          color: '#718096',
+          margin: [0, 0, 0, 10]
+        },
+        sectionHeader: {
+          margin: [0, 15, 0, 10]
+        },
+        sectionHeaderText: {
+          bold: true,
+          fontSize: 13,
+          color: '#ffffff',
+          fillColor: '#2c3e50',
+          margin: [10, 5, 10, 5]
+        },
+        employeeDetails: {
+          fontSize: 12,
+          lineHeight: 1.4,
+          margin: [15, 10, 0, 15]
+        },
+        bodyText: {
+          fontSize: 12,
+          lineHeight: 1.4,
+          margin: [15, 10, 0, 15],
+          alignment: 'justify'
+        },
+        signatureBlock: {
+          fontSize: 12,
+          lineHeight: 1.8,
+          margin: [15, 20, 0, 10]
+        },
+        disclaimerText: {
+          italics: true,
+          fontSize: 10,
+          color: '#e53e3e',
+          margin: [15, 20, 0, 0]
+        },
+        preambleText: {
+          fontSize: 12,
+          lineHeight: 1.4,
+          alignment: 'justify',
+          margin: [0, 0, 0, 15]
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto'
+      }
+    };
+
+      const pdfDoc = printer.createPdfKitDocument(docDefinition);
+      const pdfBuffer = await new Promise((resolve, reject) => {
+        const chunks = [];
+        pdfDoc.on('data', chunk => chunks.push(chunk));
+        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+        pdfDoc.on('error', reject);
+        pdfDoc.end();
+      });
+  
+      // Professional Email Template
+      const mailOptions = {
+        from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: `Official Work Transfer Certificate - ${user.firstName} ${user.lastName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #2c3e50;">Employment Certificate Attached</h2>
+            <p>Dear ${user.firstName},</p>
+            <p>Please find attached your official employment certificate as requested.</p>
+            <p><strong>Document Details:</strong></p>
+            <ul>
+              <li>Issued Date: ${new Date().toLocaleDateString()}</li>
+              <li>Certificate Number: ${request._id.toString().slice(-8).toUpperCase()}</li>
+            </ul>
+            <p>This document contains sensitive information. Please handle it securely.</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 0.9em; color: #666;">
+              ${process.env.COMPANY_NAME}<br>
+              ${process.env.COMPANY_ADDRESS}<br>
+              Phone: ${process.env.COMPANY_PHONE}<br>
+              Email: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
+            </p>
+          </div>
+        `,
+        attachments: [{
+          filename: `Employment-Certificate-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      };
+      console.log("mail",mailOptions);
+      await transporter.sendMail(mailOptions);
+  
+      return {
+        documentData: {
+          type: 'Employment Certificate',
+          certificateNumber: request._id.toString().slice(-8).toUpperCase(),
+          issuedDate: new Date(),
+          recipient: user.email
+        },
+        emailSent: true
+      };
+
+  } catch (error) {
+    console.error('Work transfer document generation failed:', error);
+    throw error;
+  }
+};
+
+function calculateYearsOfService(hireDate) {
+  const diff = new Date() - new Date(hireDate);
+  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
+}
+
+module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest };

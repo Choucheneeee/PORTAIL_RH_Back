@@ -25,6 +25,12 @@ const UserSchema = new mongoose.Schema({
       department: String,
       hiringDate: Date,
       salary: Number,
+      jobDescription: {
+        responsibilities: [String],  // Array of job responsibilities
+        qualifications: [String],    // Array of required qualifications
+        effectiveDate: Date,    
+             // When JD was last updated
+      }
     },
     socialInfo: {
       maritalStatus: String,
