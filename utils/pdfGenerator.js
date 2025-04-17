@@ -974,4 +974,531 @@ function calculateYearsOfService(hireDate) {
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
 }
 
-module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest };
+const generateSalaryCertificate = async (user, request) => {
+  try {
+    const docDefinition = {
+      pageOrientation: 'portrait',
+      pageMargins: [40, 120, 40, 60],
+      header: {
+        columns: [
+          { 
+            image: 'logo.jpeg',
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            text: [
+              { text: 'SALARY CERTIFICATE\n', style: 'headerTitle' },
+              { 
+                text: [
+                  { text: 'Certificate Number: ', bold: true },
+                  `${request._id.toString().slice(-8).toUpperCase()}\n`,
+                  { text: 'Issued Date: ', bold: true },
+                  new Date().toLocaleDateString()
+                ],
+                style: 'headerDetails'
+              }
+            ],
+            margin: [20, 25, 0, 0]
+          }
+        ]
+      },
+      content: [
+        { text: 'OFFICIAL SALARY CERTIFICATE', style: 'documentTitle' },
+        { text: '\n' },
+
+        // Employee Information
+        {
+          text: [
+            { text: 'This is to certify that:\n\n', style: 'certificateIntro' },
+            { text: 'Employee Name: ', bold: true }, 
+            `${user.firstName} ${user.lastName}\n`,
+            { text: 'Position: ', bold: true }, 
+            `${user.professionalInfo?.position || 'N/A'}\n`,
+            { text: 'Department: ', bold: true }, 
+            `${user.professionalInfo?.department || 'N/A'}\n`,
+            { text: 'Date of Joining: ', bold: true }, 
+            `${new Date(user.professionalInfo?.hiringDate).toLocaleDateString() || 'N/A'}\n\n`
+          ],
+          style: 'employeeInfo'
+        },
+
+        // Salary Details
+        {
+          text: [
+            { text: 'Current Salary Structure\n', style: 'sectionTitle' },
+            `As of ${new Date().toLocaleDateString()}, the monthly salary details are as follows:\n\n`,
+            { text: 'Basic Salary: ', bold: true }, 
+            `${formatCurrency(request.paydetails.basicSalary)}\n`,
+            { text: 'Allowances: ', bold: true }, 
+            `${formatCurrency(request.paydetails.allowances)}\n`,
+            { text: 'Fixed Deductions: ', bold: true }, 
+            `${formatCurrency(request.paydetails.totalDeductions)}\n\n`,
+            { text: 'Net Monthly Salary: ', bold: true }, 
+            { 
+              text: `${formatCurrency(request.paydetails.netPay)}\n`,
+              style: 'netSalary'
+            }
+          ],
+          style: 'salaryDetails'
+        },
+        { text: '\n' },
+
+        // Official Declaration
+        {
+          text: [
+            { text: 'Declaration\n', style: 'sectionTitle' },
+            `This certificate is issued at the request of the employee for official purposes. 
+            The information provided herein is true and accurate to the best of our records 
+            as of the date of issuance.\n\n`,
+            { text: 'Authorized Signatory\n', style: 'signatoryLabel' },
+            { text: `${process.env.COMPANY_NAME}\n`, style: 'companyName' },
+            { text: 'Human Resources Department\n', style: 'departmentName' }
+          ],
+          style: 'declarationText'
+        },
+
+        // Footer
+        {
+          text: [
+            { text: '\n' },
+            { text: process.env.COMPANY_ADDRESS, style: 'footerText' },
+            { text: `Contact: ${process.env.HR_EMAIL} | ${process.env.COMPANY_PHONE}`, style: 'footerContact' },
+            { text: 'This document is electronically verified and requires no physical signature', style: 'footerNote' }
+          ],
+          alignment: 'center'
+        }
+      ],
+      styles: {
+        headerTitle: {
+          fontSize: 18,
+          bold: true,
+          color: '#1a365d'
+        },
+        headerDetails: {
+          fontSize: 10,
+          color: '#666',
+          lineHeight: 1.3
+        },
+        documentTitle: {
+          fontSize: 16,
+          bold: true,
+          color: '#2c3e50',
+          alignment: 'center',
+          margin: [0, 0, 0, 10]
+        },
+        certificateIntro: {
+          fontSize: 12,
+          italic: true,
+          margin: [0, 0, 0, 10]
+        },
+        employeeInfo: {
+          fontSize: 12,
+          lineHeight: 1.6,
+          margin: [0, 0, 0, 15]
+        },
+        sectionTitle: {
+          fontSize: 14,
+          bold: true,
+          color: '#ffffff',
+          background: '#2c3e50',
+          margin: [0, 5, 0, 10],
+          padding: [8, 5],
+          borderRadius: 3
+        },
+        salaryDetails: {
+          fontSize: 12,
+          lineHeight: 1.5,
+          margin: [0, 0, 0, 15]
+        },
+        netSalary: {
+          bold: true,
+          color: '#1a365d',
+          fontSize: 14
+        },
+        declarationText: {
+          fontSize: 12,
+          lineHeight: 1.4
+        },
+        signatoryLabel: {
+          bold: true,
+          margin: [0, 15, 0, 5]
+        },
+        companyName: {
+          fontSize: 12,
+          bold: true,
+          color: '#2c3e50'
+        },
+        departmentName: {
+          fontSize: 11,
+          color: '#666'
+        },
+        footerText: {
+          fontSize: 10,
+          color: '#666'
+        },
+        footerContact: {
+          fontSize: 10,
+          color: '#1a365d'
+        },
+        footerNote: {
+          fontSize: 9,
+          italic: true,
+          color: '#999'
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 12,
+        lineHeight: 1.4
+      }
+    };
+
+    // PDF Generation
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      pdfDoc.on('data', chunk => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+
+    // Email Configuration
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: `Salary Certificate - ${user.firstName} ${user.lastName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color: #2c3e50;">Official Salary Certificate Attached</h2>
+          <p>Dear ${user.firstName},</p>
+          <p>Please find attached your official salary certificate as requested.</p>
+          <p><strong>Document Details:</strong></p>
+          <ul>
+            <li>Certificate Number: ${request._id.toString().slice(-8).toUpperCase()}</li>
+            <li>Issued Date: ${new Date().toLocaleDateString()}</li>
+          </ul>
+          <hr style="border: 1px solid #eee; margin: 20px 0;">
+          <p style="font-size: 0.9em; color: #666;">
+            ${process.env.COMPANY_NAME}<br>
+            ${process.env.COMPANY_ADDRESS}<br>
+            HR Contact: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
+          </p>
+        </div>
+      `,
+      attachments: [{
+        filename: `Salary-Certificate-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      documentData: {
+        type: 'Salary Certificate',
+        certificateNumber: request._id.toString().slice(-8).toUpperCase(),
+        issuedDate: new Date(),
+        recipient: user.email
+      },
+      emailSent: true
+    };
+
+  } catch (error) {
+    console.error('Salary certificate generation failed:', error);
+    throw error;
+  }
+};
+const generateTaxCertificate = async (user, request) => {
+  console.log("request",request);
+  try {
+    const docDefinition = {
+      pageOrientation: 'portrait',
+      pageMargins: [40, 120, 40, 60],
+      header: {
+        columns: [
+          { 
+            image: 'logo.jpeg',
+            width: 100,
+            margin: [40, 20, 0, 0]
+          },
+          { 
+            text: [
+              { text: 'TAX CERTIFICATE\n', style: 'headerTitle' },
+              { 
+                text: [
+                  { text: 'Fiscal Year: ', bold: true },
+                  `${new Date(request.paydetails.periodStart).getFullYear()}\n`,
+                  { text: 'Certificate ID: ', bold: true },
+                  `TX-${request._id.toString().slice(-8).toUpperCase()}`
+                ],
+                style: 'headerDetails'
+              }
+            ],
+            margin: [20, 25, 0, 0]
+          }
+        ]
+      },
+      content: [
+        { text: 'OFFICIAL TAX CERTIFICATE', style: 'documentTitle' },
+        { text: '\n' },
+
+        // Employee Information
+        {
+          text: [
+            { text: 'This is to certify that:\n\n', style: 'certificateIntro' },
+            { text: 'Name: ', bold: true }, 
+            `${user.firstName} ${user.lastName}\n`,
+            { text: 'Tax Identification Number: ', bold: true }, 
+            `${user.financialInfo?.taxId || 'N/A'}\n`,
+            
+            { text: 'Position: ', bold: true }, 
+            `${user.professionalInfo?.position || 'N/A'}\n`,
+            { text: 'Date of Employment: ', bold: true }, 
+            `${new Date(user.professionalInfo?.hiringDate).toLocaleDateString() || 'N/A'}\n\n`
+          ],
+          style: 'employeeInfo'
+        },
+
+        // Tax Details
+        {
+          text: [
+            { text: 'Tax Information\n', style: 'sectionTitle' },
+            { text: '\n' },
+            `For the fiscal year ${new Date(request.paydetails.periodStart).getFullYear()}, the following tax details are certified:\n\n`,
+            
+            { text: 'Total Annual Income: ', bold: true }, 
+            `${formatCurrency(request.paydetails.totalEarnings * 12)}\n`,
+            { text: 'Taxes Withheld: ', bold: true }, 
+            `${formatCurrency(request.paydetails.tax * 12)}\n`,
+            { text: 'Allowable Deductions: ', bold: true }, 
+            `${formatCurrency(request.paydetails.totalDeductions * 12)}\n\n`,
+            
+            { text: 'Net Taxable Income: ', bold: true }, 
+            { 
+              text: `${formatCurrency((request.paydetails.totalEarnings - request.paydetails.totalDeductions) * 12)}\n`,
+              style: 'netTaxable'
+            }
+          ],
+          style: 'taxDetails'
+        },
+        { text: '\n' },
+
+        
+        {
+          stack: [
+            { text: 'Income Breakdown', style: 'sectionTitle' },
+            {
+              ul: [
+                `Basic Salary: ${formatCurrency(request.paydetails.basicSalary)}/month`,
+                `Allowances: ${formatCurrency(request.paydetails.allowances)}/month`,
+                `Overtime: ${formatCurrency(request.paydetails.overtime)}/month`
+              ],
+              style: 'breakdownList'
+            }
+          ],
+          margin: [0, 0, 0, 10]
+        },
+        
+        // Deduction Details
+        {
+          stack: [
+            { text: 'Tax Deductions', style: 'sectionTitle' },
+            {
+              ul: [
+                `Income Tax: ${formatCurrency(request.paydetails.tax)}/month`,
+                `Social Security: ${formatCurrency(request.paydetails.insurance)}/month`,
+                `Other Deductions: ${formatCurrency(request.paydetails.otherDeductions)}/month`
+              ],
+              style: 'deductionList'
+            }
+          ],
+          margin: [0, 0, 0, 10]
+        },
+        { text: '\n' },
+
+        // Official Declaration
+        {
+          text: [
+            { text: 'Legal Declaration\n', style: 'sectionTitle' },
+            { text: '\n' },
+            `This document serves as official verification of tax information for ${new Date().getFullYear()} fiscal year.\n\n`,
+            `• Issued in accordance with national tax regulations\n`,
+            `• Valid for submission to tax authorities\n`,
+            `• Subject to audit verification\n\n`,
+            { text: 'Authorized Signatory\n', style: 'signatoryLabel' },
+            { text: `${process.env.COMPANY_NAME}\n`, style: 'companyName' },
+            { text: 'Finance Department\n', style: 'departmentName' }
+          ],
+          style: 'declarationText'
+        },
+
+        // Footer
+        {
+          text: [
+            { text: '\n' },
+            { text: process.env.COMPANY_ADDRESS, style: 'footerText' },
+            { text: `Tax Office Registration: ${process.env.TAX_REG_NUMBER}`, style: 'footerLegal' },
+            { text: 'This document contains sensitive financial information - Handle with confidentiality', style: 'footerWarning' }
+          ],
+          alignment: 'center'
+        }
+      ],
+      styles: {
+        headerTitle: {
+          fontSize: 18,
+          bold: true,
+          color: '#1a365d'
+        },
+        headerDetails: {
+          fontSize: 10,
+          color: '#666',
+          lineHeight: 1.3
+        },
+        documentTitle: {
+          fontSize: 16,
+          bold: true,
+          color: '#2c3e50',
+          alignment: 'center',
+          margin: [0, 0, 0, 10]
+        },
+        certificateIntro: {
+          fontSize: 12,
+          italic: true,
+          margin: [0, 0, 0, 10]
+        },
+        employeeInfo: {
+          fontSize: 12,
+          lineHeight: 1.6,
+          margin: [0, 0, 0, 15]
+        },
+        sectionTitle: {
+          fontSize: 14,
+          bold: true,
+          color: '#ffffff',
+          background: '#2c3e50',
+          margin: [0, 5, 0, 10],
+          padding: [8, 5],
+          borderRadius: 3
+        },
+        taxDetails: {
+          fontSize: 12,
+          lineHeight: 1.5,
+          margin: [0, 0, 0, 15]
+        },
+        netTaxable: {
+          bold: true,
+          color: '#1a365d',
+          fontSize: 14,
+          background: '#f0f4f8',
+          padding: [5, 3],
+          borderRadius: 2
+        },
+        breakdownList: {
+          fontSize: 12,
+          lineHeight: 1.4
+        },
+        deductionList: {
+          fontSize: 12,
+          lineHeight: 1.4
+        },
+        declarationText: {
+          fontSize: 12,
+          lineHeight: 1.4
+        },
+        signatoryLabel: {
+          bold: true,
+          margin: [0, 15, 0, 5]
+        },
+        companyName: {
+          fontSize: 12,
+          bold: true,
+          color: '#2c3e50'
+        },
+        departmentName: {
+          fontSize: 11,
+          color: '#666'
+        },
+        footerText: {
+          fontSize: 10,
+          color: '#666'
+        },
+        footerLegal: {
+          fontSize: 10,
+          color: '#1a365d'
+        },
+        footerWarning: {
+          fontSize: 9,
+          color: '#e53e3e',
+          bold: true
+        }
+      },
+      defaultStyle: {
+        font: 'Roboto',
+        fontSize: 12,
+        lineHeight: 1.4
+      },
+    };
+
+    // PDF Generation
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const chunks = [];
+      pdfDoc.on('data', chunk => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+
+    // Email Configuration
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME} Finance Department" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: `Tax Certificate - FY ${new Date(request.paydetails.periodStart).getFullYear()}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color: #2c3e50;">Official Tax Certificate Attached</h2>
+          <p>Dear ${user.firstName},</p>
+          <p>Please find attached your tax certificate for fiscal year ${new Date(request.paydetails.periodStart).getFullYear()}.</p>
+          <p><strong>Document Details:</strong></p>
+          <ul>
+            <li>Certificate ID: TX-${request._id.toString().slice(-8).toUpperCase()}</li>
+            <li>Issued Date: ${new Date().toLocaleDateString()}</li>
+            <li>Tax Year: ${new Date(request.paydetails.periodStart).getFullYear()}</li>
+          </ul>
+          <hr style="border: 1px solid #eee; margin: 20px 0;">
+          <p style="font-size: 0.9em; color: #666;">
+            ${process.env.COMPANY_NAME}<br>
+            ${process.env.COMPANY_ADDRESS}<br>
+            Tax Office Registration: ${process.env.TAX_REG_NUMBER}
+          </p>
+        </div>
+      `,
+      attachments: [{
+        filename: `Tax-Certificate-${user.lastName}-FY${new Date(request.paydetails.periodStart).getFullYear()}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      documentData: {
+        type: 'Tax Certificate',
+        certificateId: `TX-${request._id.toString().slice(-8).toUpperCase()}`,
+        fiscalYear: new Date(request.paydetails.periodStart).getFullYear(),
+        issuedDate: new Date(),
+        recipient: user.email
+      },
+      emailSent: true
+    };
+
+  } catch (error) {
+    console.error('Tax certificate generation failed:', error);
+    throw error;
+  }
+};
+module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate };

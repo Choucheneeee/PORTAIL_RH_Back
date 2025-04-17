@@ -2,7 +2,7 @@ const Request = require("../models/requests.model");
 const Document = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
-const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest } = require("../utils/pdfGenerator");
+const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate } = require("../utils/pdfGenerator");
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate) {
   let count = 0;
@@ -74,7 +74,7 @@ exports.createRequest = async (req, res) => {
       };
     } 
     // Handle other document types
-    if (documentType === 'Payslip') {
+    if (documentType === 'Payslip' || documentType === 'Salary Certificate' || documentType === 'Tax Certificate') {
       console.log("req.body",req.body)
       const { allowances, basicSalary, insurance, otherDeductions,overtime,periodEnd,periodStart,tax } = req.body.paydetails;
       
@@ -145,6 +145,27 @@ exports.createRequest = async (req, res) => {
       if (documentType === "Job Description" && !user.professionalInfo.jobDescription) {
         return res.status(400).json({
           error: "Job description details not found"
+        });
+      }
+    }
+    if (documentType === "Payslip") {
+      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
+        return res.status(400).json({ 
+          error: "User professional information is required for this request" 
+        });
+      }
+    }
+    if (documentType === "Salary Certificate") {
+      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
+        return res.status(400).json({
+          error: "User professional information is required for this request"
+          });
+      }
+      }
+    if (documentType === "Tax Certificate") {
+      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
+        return res.status(400).json({
+          error: "User professional information is required for this request"
         });
       }
     }
