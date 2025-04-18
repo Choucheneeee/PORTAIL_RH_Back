@@ -7,6 +7,7 @@ const nodemailer = require("nodemailer");
 const crypto = require('crypto');
 
 exports.registerUser = async (req, res) => {
+  console.log("registerUser called", req.body);
   try {
     const { firstName, lastName, email, password, role } = req.body;
 
@@ -38,7 +39,7 @@ exports.registerUser = async (req, res) => {
     res.status(201).json({ message: "User registered. Check email for verification code." });
   } 
     catch (error) {
-    // res.status(500).json({ message: "Server error", error: error.message });
+     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 

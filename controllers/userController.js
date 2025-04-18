@@ -49,25 +49,30 @@ exports.updateuser = updateuser;
 
 exports.allusers = async (req, res) => {
   try { 
-    // Fetch verified and unverified users separately
-    const verifiedUsers = await User.find({ isVerified: true });
-    const unverifiedUsers = await User.find({ isVerified: false });
-    const requests = (await Request.find()).length;
+    // Get only collaborateur users (verified and unverified)
+    const verifiedUsers = await User.find({ 
+      isVerified: true,
+      role: "collaborateur"
+    });
+    const rh= await User.find({
+      isVerified: true,
+      role: "rh"
+    });
 
 
-    const totalUsers = verifiedUsers.length;
-    const adminCount = verifiedUsers.filter(user => user.role === "admin").length;
-    const collaboratorCount = totalUsers - adminCount;
+    const unverifiedUsers = await User.find({ 
+      isVerified: false, 
+      role: "collaborateur" 
+    });
+
+    const requests = await Request.countDocuments();
 
     const output = {
-      "Totalusers": totalUsers,
-      "request":requests,  // Only counts verified users
-      "Numberadmins": adminCount,
-      "Numbercollaborators": collaboratorCount,
-      "admin": verifiedUsers.filter(user => user.role === "admin"),
-      "rh": verifiedUsers.filter(user => user.role === "rh"),
-      "collaborator": verifiedUsers.filter(user => user.role === "collaborateur"),
-      "unverifiedUsers": unverifiedUsers // Include unverified users but don't count them
+      request: requests,
+      Numbercollaborators: verifiedUsers.length,
+      collaborator: verifiedUsers,
+      unverifiedUsers: unverifiedUsers,
+      rh:rh
     };
 
     res.json(output);

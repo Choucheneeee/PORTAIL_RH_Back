@@ -59,9 +59,9 @@ io.on('connection', (socket) => {
     console.log(`User joined room: ${userRoom}`);
 
     // Join admin room if user is admin
-    if (socket.role === 'admin') {
-        socket.join('admins');
-        console.log(`Admin joined admins room`);
+    if (socket.role === 'rh') {
+        socket.join('rhs');
+        console.log(`Admin joined rhs room`);
     }
 
     // Message handling
@@ -92,7 +92,7 @@ io.on('connection', (socket) => {
             console.log(`Sender: ${socket.role} ${userId}`);
             console.log(`Payload:`, JSON.stringify(data, null, 2));
 
-            if (socket.role === 'admin') {
+            if (socket.role === 'rh') {
                 if (!data.targetUserId) {
                     throw new Error('Target user ID required for admin notifications');
                 }
@@ -119,8 +119,8 @@ io.on('connection', (socket) => {
                 console.log(`Notification sent to ${targetRoom}`);
 
             } else if (socket.role === 'collaborateur') {
-                console.log('Notifying all admins');
-                io.to('admins').emit('notif', {
+                console.log('Notifying all rhs');
+                io.to('rhs').emit('notif', {
                     type: 'new_request',
                     message: data.message,
                     senderId: userId,

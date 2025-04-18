@@ -6,7 +6,7 @@ exports.createNotification = async (req, res) => {
     const sender = req.user;
     const { message, recipientId } = req.body;
 
-    if (sender.role === 'admin') {
+    if (sender.role === 'rh') {
       if (!recipientId) {
         return res.status(400).json({ message: 'Recipient ID is required' });
       }
@@ -26,20 +26,20 @@ exports.createNotification = async (req, res) => {
     }
     else if (sender.role === 'collaborateur') {
 
-        const admins = await User.find({ role: 'admin' });
+        const rhs = await User.find({ role: 'rh' });
 
-      if (admins.length === 0) {
-        return res.status(404).json({ message: 'No admins found' });
+      if (rhs.length === 0) {
+        return res.status(404).json({ message: 'No rhs found' });
       }
       
-      const notifications = admins.map(admin => ({
+      const notifications = rhs.map(rh => ({
         sender: sender.id,
-        recipient: admin._id,
+        recipient: rh._id,
         message
       }));
 
       await notification.insertMany(notifications);
-      return res.status(201).json({ message: 'Notification sent to all admins' });
+      return res.status(201).json({ message: 'Notification sent to all rhs' });
     }
 
     return res.status(403).json({ message: 'Unauthorized role' });
