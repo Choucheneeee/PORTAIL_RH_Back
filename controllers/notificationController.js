@@ -31,7 +31,7 @@ exports.createNotification = async (req, res) => {
       if (rhs.length === 0) {
         return res.status(404).json({ message: 'No rhs found' });
       }
-      
+      //msg
       const notifications = rhs.map(rh => ({
         sender: sender.id,
         recipient: rh._id,
