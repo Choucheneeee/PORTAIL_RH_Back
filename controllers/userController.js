@@ -18,26 +18,38 @@ exports.getuser = async (req, res) => {
 
 const updateuser = async (req, res) => {
   try {
-    const userId = req.user.id;  // Ensure that `authMiddleware` sets `req.user`
+    const userId = req.user.id;
 
-    // Convert the date fields in req.body to Date objects if they exist and are in the correct format
-    if (req.body.personalInfo && req.body.personalInfo.birthDate) {
-      // Convert 'dd/mm/yyyy' to 'yyyy-mm-dd' format before converting to a Date object
-      req.body.personalInfo.birthDate = new Date(req.body.personalInfo.birthDate.split('/').reverse().join('-'));
-    }
-    if (req.body.professionalInfo && req.body.professionalInfo.hiringDate) {
-      // Convert 'dd/mm/yyyy' to 'yyyy-mm-dd' format before converting to a Date object
-      req.body.professionalInfo.hiringDate = new Date(req.body.professionalInfo.hiringDate.split('/').reverse().join('-'));
+    // 1. Handle profile image upload
+    if (req.file) {
+      req.body.profileImage = `/uploads/${req.file.filename}`;
     }
 
-    // Find the user by ID and update the fields
-    const updatedUser = await User.findByIdAndUpdate(userId, req.body, { new: true });
+    // 2. Convert date fields (now works with nested data from form-data)
+    if (req.body.personalInfo?.birthDate) {
+      req.body.personalInfo.birthDate = new Date(
+        req.body.personalInfo.birthDate.split('/').reverse().join('-')
+      );
+    }
+    
+    if (req.body.professionalInfo?.hiringDate) {
+      req.body.professionalInfo.hiringDate = new Date(
+        req.body.professionalInfo.hiringDate.split('/').reverse().join('-')
+      );
+    }
+
+    // 3. Update user with all fields
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      req.body,
+      { new: true, runValidators: true }
+    );
 
     if (!updatedUser) {
       return res.status(404).send('User not found');
     }
 
-    res.json("User updated successfully");
+    res.json(updatedUser);  // Return updated user data
   } catch (error) {
     console.error(error);
     res.status(500).send('Error updating user');

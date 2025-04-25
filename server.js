@@ -5,6 +5,7 @@ const connectDB = require("./config/db");
 require("./routes/authRoutes");
 const app = express();
 
+const path = require("path");
 const http = require('http');
 const server = http.createServer(app);
 
@@ -163,6 +164,7 @@ app.get('/api/online-users', (req, res) => {
 connectDB();
 app.use(cors("*"));
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
