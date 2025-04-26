@@ -3,18 +3,19 @@ const User = require('../models/User.model'); // Assuming you have a User model
 
 // Send a new message
 exports.sendMessage = async (req, res) => {
+  console.log("message",req.body)
   try {
-    const { receiverId, text,senderId,timestamp} = req.body;
+    const { receiver, content,sender,timestamp} = req.body;
 
-    const receiver = await User.findById(receiverId);
-    if (!receiver) {
+    const receiveruser = await User.findById(receiver);
+    if (!receiveruser) {
       return res.status(404).json({ error: 'Receiver not found' });
     }
 
     const message = new Message({
-      sender: senderId,
-      receiver: receiverId,
-      content:text,
+      sender: sender,
+      receiver: receiver,
+      content:content,
       timestamp: timestamp,
     });
 
@@ -22,6 +23,7 @@ exports.sendMessage = async (req, res) => {
 
     res.status(201).json(message);
   } catch (error) {
+    console.log(error,"error")
     res.status(500).json({ error: error.message });
   }
 };

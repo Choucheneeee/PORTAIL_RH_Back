@@ -1,3 +1,4 @@
+// Routes de gestion des demandes
 const express = require("express");
 const Request = require("../models/requests.model");
 const router = express.Router();
@@ -11,7 +12,7 @@ const {
 } = require("../controllers/requestController");
 const auth = require("../middleware/auth");
 
-// Unified Request Endpoints
+// Points de terminaison unifiés pour les demandes
 router.post("/", auth, createRequest);
 router.get("/", auth, getAllRequests);
 router.get("/collaborator", auth, getCollaboratorRequests);
