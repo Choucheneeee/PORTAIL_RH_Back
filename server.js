@@ -26,51 +26,51 @@ io.use((socket, next) => {
     const userId = socket.handshake.query.userId;
     const role = socket.handshake.query.role; // 'admin' or 'collaborateur'
     
-    if (!userId || !role) return next(new Error("Authentication required"));
+    if (!userId || !role) return next(new Error("Authentification requise"));
     
     socket.userId = userId;
     socket.role = role;
     next();
   });
 
-  let onlineUsers = new Set(); // Track user IDs instead of socket IDs
+  let onlineUsers = new Set(); // Suivre les IDs des utilisateurs au lieu des IDs de socket
 
 
-  // Server-side (Socket.IO) with online status tracking
-let userConnections = new Map(); // Tracks { userId: connectionCount }
+  // Côté serveur (Socket.IO) avec suivi du statut en ligne
+let userConnections = new Map(); // Suit { userId: nombreDeConnexions }
 
 io.on('connection', (socket) => {
     const userId = socket.userId;
-    console.log(`${socket.role} ${userId} connected`);
+    console.log(`${socket.role} ${userId} connecté`);
 
-    // Update connection count
+    // Mettre à jour le nombre de connexions
     const connections = userConnections.get(userId) || 0;
     userConnections.set(userId, connections + 1);
     
-    // Notify ONLY if this was first connection
-    io.emit('online-users', Array.from(onlineUsers)); // Broadcast to all clients
+    // Notifier UNIQUEMENT si c'était la première connexion
+    io.emit('online-users', Array.from(onlineUsers)); // Diffuser à tous les clients
 
     if (connections === 0) {
         io.emit('online-users', Array.from(userConnections.keys()));
     }
 
-    // Join user-specific room
+    // Rejoindre la salle spécifique à l'utilisateur
     const userRoom = `user_${userId}`;
     socket.join(userRoom);
-    console.log(`User joined room: ${userRoom}`);
+    console.log(`Utilisateur a rejoint la salle: ${userRoom}`);
 
-    // Join admin room if user is admin
+    // Rejoindre la salle admin si l'utilisateur est admin
     if (socket.role === 'rh') {
         socket.join('rhs');
-        console.log(`Admin joined rhs room`);
+        console.log(`Admin a rejoint la salle rhs`);
     }
 
-    // Message handling
+    // Gestion des messages
     socket.on('chat-message', (data) => {
-        console.log('Received message:', {
-            from: userId,
-            to: data.recipientId,
-            content: data.message
+        console.log('Message reçu:', {
+            de: userId,
+            à: data.recipientId,
+            contenu: data.message
         });
 
         const recipientRoom = `user_${data.recipientId}`;
@@ -81,32 +81,32 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Online users handling
+    // Gestion des utilisateurs en ligne
     socket.on('request-online-users', () => {
         socket.emit('online-users', Array.from(userConnections.keys()));
     });
 
-    // Notification handling
+    // Gestion des notifications
     socket.on('notif', async (data) => {
         try {
-            console.log(`\n--- NEW NOTIFICATION ---`);
-            console.log(`Sender: ${socket.role} ${userId}`);
-            console.log(`Payload:`, JSON.stringify(data, null, 2));
+            console.log(`\n--- NOUVELLE NOTIFICATION ---`);
+            console.log(`Expéditeur: ${socket.role} ${userId}`);
+            console.log(`Contenu:`, JSON.stringify(data, null, 2));
 
             if (socket.role === 'rh') {
                 if (!data.targetUserId) {
-                    throw new Error('Target user ID required for admin notifications');
+                    throw new Error('ID utilisateur cible requis pour les notifications admin');
                 }
 
                 const targetRoom = `user_${data.targetUserId}`;
-                console.log(`Attempting to notify room: ${targetRoom}`);
+                console.log(`Tentative de notification de la salle: ${targetRoom}`);
 
-                // Verify target room existence
+                // Vérifier l'existence de la salle cible
                 const socketsInRoom = await io.in(targetRoom).allSockets();
-                console.log(`Active connections in ${targetRoom}:`, socketsInRoom.size);
+                console.log(`Connexions actives dans ${targetRoom}:`, socketsInRoom.size);
 
                 if (socketsInRoom.size === 0) {
-                    console.warn(`Target user ${data.targetUserId} is not connected!`);
+                    console.warn(`L'utilisateur cible ${data.targetUserId} n'est pas connecté!`);
                     return;
                 }
 
@@ -117,10 +117,10 @@ io.on('connection', (socket) => {
                     timestamp: new Date().toISOString()
                 });
 
-                console.log(`Notification sent to ${targetRoom}`);
+                console.log(`Notification envoyée à ${targetRoom}`);
 
             } else if (socket.role === 'collaborateur') {
-                console.log('Notifying all rhs');
+                console.log('Notification de tous les rhs');
                 io.to('rhs').emit('notif', {
                     type: 'new_request',
                     message: data.message,
@@ -129,16 +129,16 @@ io.on('connection', (socket) => {
                 });
             }
         } catch (error) {
-            console.error("[NOTIFICATION ERROR]", error.message);
+            console.error("[ERREUR DE NOTIFICATION]", error.message);
             socket.emit('error', { message: error.message });
         }
     });
 
-    // Disconnect handling
+    // Gestion de la déconnexion
     socket.on('disconnect', () => {
-        console.log(`${socket.role} ${userId} disconnected`);
+        console.log(`${socket.role} ${userId} déconnecté`);
         
-        // Update connection count
+        // Mettre à jour le nombre de connexions
         const connections = userConnections.get(userId) || 1;
         if (connections === 1) {
             userConnections.delete(userId);
@@ -156,7 +156,7 @@ app.get('/api/online-users', (req, res) => {
     try {
         res.json({ success: true, onlineUsers: onlineUsers.size });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error fetching online users' });
+        res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs en ligne' });
     }
 });
 
@@ -175,4 +175,4 @@ app.use("/api/notification", require("./routes/notificationRoutes"));
 
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Serveur en cours d'exécution sur le port ${PORT}`));
