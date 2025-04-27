@@ -15,3 +15,5 @@ router.get("/get-notification/:userId", notificationController.getNotifications)
 // router.post("/send-notificationAdmin", authMiddleware, notificationController.createNotificationAdmin);
 
 module.exports = router;
+
+//msg
