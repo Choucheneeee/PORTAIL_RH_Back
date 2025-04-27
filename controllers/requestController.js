@@ -3,6 +3,8 @@ const Document = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate } = require("../utils/pdfGenerator");
+
+
 // Helper function to calculate working days
 function calculateWorkingDays(startDate, endDate) {
   let count = 0;

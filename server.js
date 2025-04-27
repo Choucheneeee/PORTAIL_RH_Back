@@ -172,6 +172,7 @@ app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 
 
 const PORT = process.env.PORT || 3000;
