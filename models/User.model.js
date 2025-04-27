@@ -18,7 +18,6 @@ const UserSchema = new mongoose.Schema({
   },
   profileImage: { 
     type: String, 
-    default: "https://www.pphfoundation.ca/wp-content/uploads/2018/05/default-avatar.png" // Default image URL
   },
   isApproved: { 
     type: Boolean, 
