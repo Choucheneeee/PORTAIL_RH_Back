@@ -5,7 +5,7 @@ const User = require("../models/User.model");
 
 exports.allusers = async (req, res) => {
   try { 
-    // Get only collaborateur users (verified and unverified)
+
     const verifiedUsers = await User.find({ 
       isVerified: true,
       role: "collaborateur"
@@ -27,9 +27,7 @@ exports.allusers = async (req, res) => {
 
 
     const output = {
-      Numbercollaborators: verifiedUsers.length,
       collaborator: verifiedUsers,
-      unverifiedUsers: unverifiedUsers,
       rh:rh,
       admin:admin
     };
