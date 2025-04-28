@@ -18,6 +18,9 @@ const io = require('socket.io')(server, {
   },
 });
 
+// Initialize scheduled tasks
+const startScheduledTasks = require('./utils/scheduledTasks');
+
 app.use(express.urlencoded({ extended: true }));
 
 // Middleware to get user ID from query parameter (for testing)
@@ -178,6 +181,9 @@ app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
+connectDB().then(() => {
+    startScheduledTasks();
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Serveur en cours d'exécution sur le port ${PORT}`));
