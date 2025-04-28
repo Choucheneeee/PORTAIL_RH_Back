@@ -99,7 +99,7 @@ exports.approveUser = async (req, res) => {
     const { userId } = req.body; // Get both userId and approve from the request body
 
     // Ensure only admin can approve/disapprove
-    if (req.user.role !== "admin") {
+    if (req.user.role !== "admin" && req.user.role!="rh") {
       return res.status(403).json({ message: "Unauthorized You must have Admin Role" });
     }
 
@@ -146,7 +146,7 @@ exports.deleteuser = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).send('Error deleting user');
-  }
+  } 
   };
 
 
