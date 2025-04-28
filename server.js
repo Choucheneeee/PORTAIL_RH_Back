@@ -59,10 +59,14 @@ io.on('connection', (socket) => {
     socket.join(userRoom);
     console.log(`Utilisateur a rejoint la salle: ${userRoom}`);
 
-    // Rejoindre la salle admin si l'utilisateur est admin
+    if (socket.role === 'admin') {
+        socket.join('admins');
+        console.log(`Admin a rejoint la salle admins`);
+    }
+
     if (socket.role === 'rh') {
         socket.join('rhs');
-        console.log(`Admin a rejoint la salle rhs`);
+        console.log(`rh a rejoint la salle rhs`);
     }
 
     // Gestion des messages
@@ -145,7 +149,7 @@ io.on('connection', (socket) => {
         } else {
             userConnections.set(userId, connections - 1);
         }
-
+        
         io.emit('online-users', Array.from(userConnections.keys()));
         socket.leave(userRoom);
         if (socket.role === 'admin') socket.leave('admins');

@@ -21,15 +21,15 @@ exports.allusers = async (req, res) => {
 
 
     const unverifiedUsers = await User.find({ 
-      isVerified: false, 
-      role: "collaborateur" 
+      isApproved: false, 
     });
 
 
     const output = {
       collaborator: verifiedUsers,
       rh:rh,
-      admin:admin
+      admin:admin,
+      unverifiedUsers:unverifiedUsers
     };
 
     res.json(output);
@@ -69,3 +69,34 @@ exports.updateruser = async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
     }
+
+exports.getData =async(req,res)=>{
+  try{
+    const verifiedUsers = await User.find({ 
+          isVerified: true,
+          role: "collaborateur"
+        });
+    const verifiedRh = await User.find({ 
+          isVerified: true,
+          role: "rh"
+        });
+    const verifiedAdmin = await User.find({ 
+          isVerified: true,
+          role: "admin"
+        });
+      
+        const output = {
+          Numbercollaborators: verifiedUsers.length,
+          NumberRh: verifiedRh.length,
+          NumberAdmin: verifiedAdmin.length,
+        };
+    res.json(output);
+
+  }
+  catch{
+    console.error(error);
+
+    res.status(500).send("Error fetching users");
+
+  }
+}
