@@ -8,7 +8,11 @@ const app = express();
 const path = require("path");
 const http = require('http');
 const server = http.createServer(app);
+const User = require("./models/User.model");
 
+connectDB().then(() => {
+    startScheduledTasks();
+})
 const io = require('socket.io')(server, {
   cors: {
     origin: 'http://localhost:4200',
@@ -100,34 +104,35 @@ io.on('connection', (socket) => {
             console.log(`Expéditeur: ${socket.role} ${userId}`);
             console.log(`Contenu:`, JSON.stringify(data, null, 2));
 
-            if (socket.role === 'rh') {
-                if (!data.targetUserId) {
-                    throw new Error('ID utilisateur cible requis pour les notifications admin');
+            if (socket.role === 'admin' || socket.role === 'rh') {
+                if (data.type === 'new_user_approval') {
+                    // For new user approval notifications, send to all admins or RHs
+                    const targetRoom = socket.role === 'admin' ? 'admins' : 'rhs';
+                    io.to(targetRoom).emit('notif', {
+                        type: 'new_user_approval',
+                        message: data.message,
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log(`Notification sent to ${targetRoom} room`);
+                } else if (data.targetUserId) {
+                    // Handle other types of notifications
+                    const targetRoom = `user_${data.targetUserId}`;
+                    const socketsInRoom = await io.in(targetRoom).allSockets();
+                    
+                    if (socketsInRoom.size === 0) {
+                        console.warn(`L'utilisateur cible ${data.targetUserId} n'est pas connecté!`);
+                        return;
+                    }
+
+                    io.to(targetRoom).emit('notif', {
+                        type: 'request_update',
+                        message: data.message,
+                        senderId: userId,
+                        timestamp: new Date().toISOString()
+                    });
                 }
-
-                const targetRoom = `user_${data.targetUserId}`;
-                console.log(`Tentative de notification de la salle: ${targetRoom}`);
-
-                // Vérifier l'existence de la salle cible
-                const socketsInRoom = await io.in(targetRoom).allSockets();
-                console.log(`Connexions actives dans ${targetRoom}:`, socketsInRoom.size);
-
-                if (socketsInRoom.size === 0) {
-                    console.warn(`L'utilisateur cible ${data.targetUserId} n'est pas connecté!`);
-                    return;
-                }
-
-                io.to(targetRoom).emit('notif', {
-                    type: 'request_update',
-                    message: data.message,
-                    senderId: userId,
-                    timestamp: new Date().toISOString()
-                });
-
-                console.log(`Notification envoyée à ${targetRoom}`);
-
             } else if (socket.role === 'collaborateur') {
-                console.log('Notification de tous les rhs');
+                // Handle collaborator notifications
                 io.to('rhs').emit('notif', {
                     type: 'new_request',
                     message: data.message,
@@ -180,9 +185,22 @@ app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 
-connectDB().then(() => {
-    startScheduledTasks();
-});
+app.get('/test-db', async (req, res) => {
+    try {
+      const count = await User.countDocuments();
+      const sampleUser = await User.findOne();
+      
+      res.json({
+        dbConnection: "OK",
+        userCount: count,
+        sampleUser: sampleUser ? "Exists" : "No users"
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Serveur en cours d'exécution sur le port ${PORT}`));
+
+module.exports = { io };
