@@ -5,30 +5,22 @@ const User = require("../models/User.model");
 const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate } = require("../utils/pdfGenerator");
 
 
-// Helper function to calculate working days
-function calculateWorkingDays(startDate, endDate) {
-  let count = 0;
-  const current = new Date(startDate);
-  const end = new Date(endDate);
-  current.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  
-  while (current <= end) {
-    const day = current.getDay();
-    if (day !== 0 && day !== 6) count++;
-    current.setDate(current.getDate() + 1);
-  }
-  return count;
+const Notification = require('../models/notifications.model');
+const io = require('../server').io;
+
+exports.createcertif=async(req,res)=>{
+
 }
-
-exports.createRequest = async (req, res) => {
+exports.createattestation=async(req,res)=>{
+  
+}
+exports.createfiche = async (req, res) => {
   try {
-    const { requestType, documentType, requestDetails, startDate, endDate } = req.body;
+    console.log("dataa",req.body)
+    const { documentType, periodType, month,year,description} = req.body;
     const userId = req.user.id;
-
-    // Validate required fields
-    if (!requestType || !documentType) {
-      return res.status(400).json({ error: "Request type and document type are required." });
+    if (!documentType || !periodType) {
+      return res.status(400).json({ error: "Request type and document periode are required." });
     }
 
     // Get user details
@@ -36,150 +28,27 @@ exports.createRequest = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-
-    // Validate document type
-    const validDocumentTypes = {
-      "Employment & Work Documents": ["Employment Certificate", "Job Description", "Work Transfer Request"],
-      "Payroll & Financial Documents": ["Payslip", "Salary Certificate", "Tax Certificate"],
-      "Leave & Time-Off Requests": ["Paid Leave Request", "Sick Leave Request", "Maternity/Paternity Leave"],
-      "HR & Administrative Requests": ["Reference Letter", "Resignation Request", "ID Badge Replacement"]
-    };
-
-    if (!validDocumentTypes[requestType]?.includes(documentType)) {
-      return res.status(400).json({ error: `"${documentType}" is not a valid document type for "${requestType}".` });
-    }
-
-    // Base request data
     const requestData = {
       user: userId,
       firstName: user.firstName,
       lastName: user.lastName,
-      requestType,
-      documentType,
+      type:documentType,
+      periode:periodType,
+      mois:month,
+      annee:year,
       status: 'Pending',
-      requestDetails: requestDetails
+      requestDetails: description
     };
 
-    // Handle Work Transfer Request specifically
-    if (documentType === 'Work Transfer Request') {
-      const { newDepartment, newPosition, effectiveDate, transferReason } = req.body;
-      
-      if (!newDepartment || !newPosition || !effectiveDate || !transferReason) {
-        return res.status(400).json({ error: "All work transfer fields are required" });
-      }
-
-      requestData.details = {
-        newDepartment,
-        newPosition,
-        effectiveDate: new Date(effectiveDate),
-        reason: transferReason
-      };
-    } 
-    // Handle other document types
-    if (documentType === 'Payslip' || documentType === 'Salary Certificate' || documentType === 'Tax Certificate') {
-      console.log("req.body",req.body)
-      const { allowances, basicSalary, insurance, otherDeductions,overtime,periodEnd,periodStart,tax } = req.body.paydetails;
-      
-      if (!allowances || !basicSalary || !insurance || !otherDeductions|| !overtime || !periodEnd|| ! periodStart || !tax) {
-        return res.status(400).json({ error: "All work transfer fields are required" });
-      }
-
-      requestData.paydetails = {
-        allowances,
-        basicSalary,
-        insurance,
-        otherDeductions,
-        overtime,
-        periodEnd: new Date(periodEnd),
-        periodStart: new Date(periodStart),
-        tax
-      };
-    } 
-
-
-    // Handle Leave & Time-Off Requests
-    if (requestType === 'Leave & Time-Off Requests') {
-      if (!startDate || !endDate) {
-        return res.status(400).json({ error: "Start and end dates are required for time-off requests" });
-      }
-
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const today = new Date().setHours(0,0,0,0);
-
-      if (start < today) {
-        return res.status(400).json({ error: "Start date cannot be in the past" });
-      }
-
-      if (start >= end) {
-        return res.status(400).json({ error: "End date must be after start date" });
-      }
-
-      const numberOfDays = calculateWorkingDays(start, end);
-      if (numberOfDays <= 0) {
-        return res.status(400).json({ error: "No working days in selected period" });
-      }
-
-      if (user.timeOffBalance < numberOfDays) {
-        return res.status(400).json({ error: "Insufficient time off balance" });
-      }
-
-      // Add leave-specific fields
-      requestData.startDate = start;
-      requestData.endDate = end;
-      requestData.numberOfDays = numberOfDays;
-    }
-
-    // Handle Employment & Work Documents validation
-    if (requestType === "Employment & Work Documents") {
-      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
-        return res.status(400).json({ 
-          error: "User professional information is required for this request" 
-        });
-      }
-
-      if (documentType === "Employment Certificate" && !user.professionalInfo.hiringDate) {
-        return res.status(400).json({
-          error: "Hiring date is required for employment certificate"
-        });
-      }
-
-      if (documentType === "Job Description" && !user.professionalInfo.jobDescription) {
-        return res.status(400).json({
-          error: "Job description details not found"
-        });
-      }
-    }
-    if (documentType === "Payslip") {
-      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
-        return res.status(400).json({ 
-          error: "User professional information is required for this request" 
-        });
-      }
-    }
-    if (documentType === "Salary Certificate") {
-      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
-        return res.status(400).json({
-          error: "User professional information is required for this request"
-          });
-      }
-      }
-    if (documentType === "Tax Certificate") {
-      if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
-        return res.status(400).json({
-          error: "User professional information is required for this request"
-        });
-      }
-    }
+   
     
     const newRequest = new Request(requestData);
     await newRequest.save();
 
-    // Notify admins
-    const admins = await User.find({ role: "admin" });
-    if (admins.length > 0) {
-      const adminEmails = admins.map(admin => admin.email);
-      await sendAdminNotification(adminEmails, user.firstName, user.lastName, requestType, documentType);
+    const rhs = await User.find({ role: "rh" });
+    if (rhs.length > 0) {
+      const rhsEmails = rhs.map(rh => rh.email);
+      await sendNotification(rhsEmails, user.firstName, user.lastName,userId, documentType,user.email);
     }
 
     res.status(201).json({ message: "Request submitted successfully", data: newRequest });
@@ -373,50 +242,8 @@ exports.updateRequest = async (req, res) => {
   }
 };
 
-// Helper function for time-off requests
-async function handleTimeOffRequest(request, status, session) {
-  const user = await User.findById(request.user).session(session);
-  
-  if (status === 'Accepted' && request.status !== 'Accepted') {
-    if (user.timeOffBalance < request.numberOfDays) {
-      throw new Error('Insufficient time off balance');
-    }
-    user.timeOffBalance -= request.numberOfDays;
-    await user.save({ session });
-  }
-  
-  if (status === 'Declined' && request.status === 'Accepted') {
-    user.timeOffBalance += request.numberOfDays;
-    await user.save({ session });
-  }
-}
 
-// Helper function for employment documents
-async function handleEmploymentDocument(request, generatorId, session) {
-  const user = await User.findById(request.user).session(session);
-  
-  // Validate professional info
-  if (!user.professionalInfo?.position || !user.professionalInfo?.department) {
-    throw new Error('Missing professional information for document generation update your account ');
-  }
 
-  // Generate PDF document
-  const docData = await generateEmploymentCertificate(user, request);
-  
-  // Create document record
-  const document = new Document({
-    ...docData,
-    generatedFor: request._id,
-    generatedBy: generatorId,
-    accessRoles: ['employee', 'hr']
-  });
-
-  await document.save({ session });
-  
-  // Link document to request
-  request.document = document._id;
-  await request.save({ session });
-}
 
 exports.deleteRequest = async (req, res) => {
   try {
@@ -441,10 +268,41 @@ exports.deleteRequest = async (req, res) => {
 };
 
 // Email functions remain the same
-async function sendAdminNotification(emails, firstName, lastName, requestType, documentType) {
-  // ... existing implementation ...
-}
+async function sendNotification(emails, firstName, lastName,id, type,email) {
+  try {
+    
 
-async function sendUserNotification(email, firstName, lastName, requestType, documentType, status) {
-  // ... existing implementation ...
+    const users = await User.find({ email: { $in: emails } });
+    
+    if (users.length === 0) {
+      console.log('No users found for notification');
+      return;
+    }
+    
+    const message = `New Request ${type} has been added:
+    🗓 ${new Date().toDateString()}
+    👤 ${firstName} ${lastName} (${email})
+      `;
+
+    const notifications = users.map(user => ({
+      sender: id,
+      recipient: user._id,
+      message: message
+    }));
+
+    await Notification.insertMany(notifications);
+
+    users.forEach(user => {
+      const userRoom = `user_${user._id}`;
+      io.to(userRoom).emit('notif', {
+        type: 'new_request_added',
+        message: message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    console.log(`Notifications sent to ${users.length} users for new ${role} approval`);
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+  }
 }

@@ -3,7 +3,9 @@ const express = require("express");
 const Request = require("../models/requests.model");
 const router = express.Router();
 const {
-  createRequest,
+  createfiche,
+  createattestation,
+  createcertif,
   getAllRequests,
   getRequestById,
   updateRequest,
@@ -13,7 +15,10 @@ const {
 const auth = require("../middleware/auth");
 
 // Points de terminaison unifiés pour les demandes
-router.post("/", auth, createRequest);
+router.post("/fiche", auth, createfiche);
+router.post("/attestation", auth, createattestation);
+router.post("/certif", auth, createcertif);
+
 router.get("/", auth, getAllRequests);
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);

@@ -10,9 +10,19 @@ const documentSchema = new mongoose.Schema({
       "certificat",
     ]
   },
-  
-  expiresAt: Date,
-}, {
+  periode:{
+    type:String,
+    enum:[
+      "Mensuel",
+      "Annuel"
+    ]
+  },
+  mois:String,
+  annee:String,
+  requestDetails:String,
+  status:String
+},
+ {
   timestamps: true
 });
 
