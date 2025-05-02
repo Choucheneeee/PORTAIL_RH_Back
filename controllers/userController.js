@@ -63,7 +63,6 @@ exports.allusers = async (req, res) => {
   try { 
     // Get only collaborateur users (verified and unverified)
     const verifiedUsers = await User.find({ 
-      isVerified: true,
       role: "collaborateur"
     });
     const rh= await User.find({

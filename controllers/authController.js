@@ -5,6 +5,10 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require('crypto');
+const io = require('../server').io;
+
+// Function to get or create system user
+
 
 exports.registerUser = async (req, res) => {
   console.log("registerUser called", req.body);
@@ -35,14 +39,77 @@ exports.registerUser = async (req, res) => {
     await user.save();
     const name=firstName +" "+lastName
     await sendVerificationEmail(email, verificationCode,name);
+    
+    if (role=="rh"){
+      const admins = await User.find({ role: "admin" });
+    if (admins.length > 0) {
+      const adminEmails = admins.map(admin => admin.email);
+      await sendNotification(adminEmails, user.firstName, user.lastName,user.role , user.email);
+    }
+  }
+    else{
+      if(role=="collaborateur"){
+        const rhs = await User.find({ role: "rh" });
+    if (rhs.length > 0) {
+      const rhEmails = rhs.map(rh => rh.email);
+      console.log("rhemails",rhEmails)
+      await sendNotification(rhEmails, user.firstName, user.lastName, user.role, user.email);
+    }
+      }
 
+    }
     res.status(201).json({ message: "User registered. Check email for verification code." });
+    
   } 
     catch (error) {
      res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
+async function sendNotification(emails, firstName, lastName, role, email) {
+  try {
+    const Notification = require('../models/notifications.model');
+    const User = require('../models/User.model');
+    const io = require('../server').io;
+
+    const users = await User.find({ email: { $in: emails } });
+    
+    if (users.length === 0) {
+      console.log('No users found for notification');
+      return;
+    }
+    
+    let systemUser = await User.findOne({ email: 'system@system.com' });
+
+    // Create notification message based on t new user's role
+    const message = `New registration requires attention:
+    🗓 ${new Date().toDateString()}
+    👤 ${firstName} ${lastName} (${email})
+    ⚙️ Role: ${role}`;    
+    // Get the system user
+
+    const notifications = users.map(user => ({
+      sender: systemUser._id,
+      recipient: user._id,
+      message: message
+    }));
+
+    await Notification.insertMany(notifications);
+
+    users.forEach(user => {
+      const userRoom = `user_${user._id}`;
+      io.to(userRoom).emit('notif', {
+        type: 'new_user_approval',
+        message: message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    console.log(`Notifications sent to ${users.length} users for new ${role} approval`);
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+  }
+}
 
 async function sendVerificationEmail(email, code,name) {
 
@@ -75,27 +142,62 @@ return "User registered successfully. Please check your email for the verificati
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    
+    // 1. Validation basique
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
-    if (!user) return res.status(404).json({ message: "User not found" });
+    // 2. Recherche de l'utilisateur
+    const user = await User.findOne({ email }).select('+password');
+    
+    if (!user) {
+      console.log(`User not found: ${email}`);
+      return res.status(401).json({ message: "Invalid credentials" }); // Message générique pour la sécurité
+    }
 
-    if (!user.isVerified) return res.status(400).json({ message: "Email not verified" });
-
-
+    // 3. Vérification du mot de passe
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Email/password Incorrect" });
+    if (!isMatch) {
+      console.log(`Password mismatch for user: ${email}`);
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-    if (!user.isApproved) return res.status(403).json({ message: "Approval pending. Contact an admin." });
+    // 4. Vérifications supplémentaires
+    if (!user.isVerified) {
+      return res.status(403).json({ message: "Email not verified" });
+    }
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    if (!user.isApproved) {
+      return res.status(403).json({ message: "Approval pending. Contact an admin." });
+    }
 
-    res.status(200).json({ 
-      token: token, 
+    // 5. Génération du token
+    const token = jwt.sign(
+      { 
+        id: user._id, 
+        role: user.role,
+        email: user.email 
+      }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: "1d" }
+    );
+
+    // 6. Réponse sans données sensibles
+    res.status(200).json({
+      token,
       userId: user._id,
       name: user.firstName,
       role: user.role,
-    });  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+      email: user.email
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 };
 
