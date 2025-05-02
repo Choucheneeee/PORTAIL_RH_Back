@@ -6,15 +6,11 @@ const documentSchema = new mongoose.Schema({
     required: true,
     enum: [
       "attestation",
-            "fiche_paie",
-            "certificat",
+      "fiche_paie",
+      "certificat",
     ]
   },
-  generatedBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User",
-    required: true 
-  },
+  
   expiresAt: Date,
 }, {
   timestamps: true

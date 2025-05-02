@@ -43,8 +43,12 @@ const UserSchema = new mongoose.Schema({
     birthDate: Date
   },
   financialInfo: {
+    RIB:String,
     bankAccount: String,
-    taxId: String
+    taxId: String,
+    CNSS:String,
+    paymentMethod:String,
+    contractType:String
   },
   professionalInfo: {
     position: String,
