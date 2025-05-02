@@ -168,7 +168,6 @@ app.get('/api/online-users', (req, res) => {
 });
 
 
-connectDB();
 app.use(cors("*"));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));

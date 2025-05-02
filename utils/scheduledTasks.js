@@ -6,7 +6,6 @@ const deleteUnverifiedUsers = async () => {
     try {
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         
-        // Find and delete unverified users created more than 24 hours ago
         const result = await User.deleteMany({
             isVerified: false,
             createdAt: { $lt: twentyFourHoursAgo }
@@ -19,13 +18,11 @@ const deleteUnverifiedUsers = async () => {
 };
 
 const startScheduledTasks = () => {
-    // Run every hour at minute 0
     cron.schedule('0 * * * *', () => {
         console.log('Running scheduled task to check for unverified users...');
         deleteUnverifiedUsers();
     });
 
-    // Also run immediately when the server starts
     console.log('Running initial check for unverified users...');
     deleteUnverifiedUsers();
 };
