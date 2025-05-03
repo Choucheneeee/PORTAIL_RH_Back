@@ -288,8 +288,15 @@ async function sendNotification(emails, firstName, lastName, id, type, email) { 
       return;
     }
     
-    const message = `📥 New ${type} request from ${firstName} ${lastName}
-🗓 ${new Date().toLocaleDateString()} ⏰ ${new Date().toLocaleTimeString()}
+    const message = `📥 Nouvelle demande ${type} de ${firstName} ${lastName}
+🗓 ${new Date().toLocaleDateString('fr-FR', { 
+  day: '2-digit', 
+  month: 'short', 
+  year: 'numeric' 
+})} ⏰ ${new Date().toLocaleTimeString('fr-FR', { 
+  hour: '2-digit', 
+  minute: '2-digit' 
+})}
 📧 ${email} | 🆔 ${id.slice(-6)}`;
 
     const notifications = users.map(user => ({

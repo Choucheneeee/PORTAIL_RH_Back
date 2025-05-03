@@ -80,12 +80,14 @@ async function sendNotification(emails, firstName, lastName, role, email) {
     let systemUser = await User.findOne({ email: 'system@system.com' });
 
     // Create notification message based on t new user's role
-    const message = `📌 New ${role} Registration
+    const message = `📌 Nouvelle inscription ${role}
 ⬩ 👤 ${firstName} ${lastName}
-⬩ 📧 ${email} 
-⬩ 🕒 ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-    // Get the system user
-
+⬩ 📧 ${email}
+⬩ 🕒 ${new Date().toLocaleTimeString('fr-FR', { 
+  hour: '2-digit', 
+  minute: '2-digit',
+  hour12: false 
+})}`;
     const notifications = users.map(user => ({
       sender: systemUser._id,
       recipient: user._id,
