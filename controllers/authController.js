@@ -5,9 +5,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require('crypto');
-const io = require('../server').io;
 
-// Function to get or create system user
 
 
 exports.registerUser = async (req, res) => {
@@ -82,10 +80,10 @@ async function sendNotification(emails, firstName, lastName, role, email) {
     let systemUser = await User.findOne({ email: 'system@system.com' });
 
     // Create notification message based on t new user's role
-    const message = `New registration requires attention:
-    🗓 ${new Date().toDateString()}
-    👤 ${firstName} ${lastName} (${email})
-    ⚙️ Role: ${role}`;    
+    const message = `📌 New ${role} Registration
+⬩ 👤 ${firstName} ${lastName}
+⬩ 📧 ${email} 
+⬩ 🕒 ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
     // Get the system user
 
     const notifications = users.map(user => ({

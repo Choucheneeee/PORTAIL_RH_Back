@@ -104,9 +104,9 @@ io.on('connection', (socket) => {
             console.log(`Expéditeur: ${socket.role} ${userId}`);
             console.log(`Contenu:`, JSON.stringify(data, null, 2));
 
+
             if (socket.role === 'admin' || socket.role === 'rh') {
                 if (data.type === 'new_user_approval') {
-                    // For new user approval notifications, send to all admins or RHs
                     const targetRoom = socket.role === 'admin' ? 'admins' : 'rhs';
                     io.to(targetRoom).emit('notif', {
                         type: 'new_user_approval',
@@ -132,7 +132,6 @@ io.on('connection', (socket) => {
                     });
                 }
             } else if (socket.role === 'collaborateur') {
-                // Handle collaborator notifications
                 io.to('rhs').emit('notif', {
                     type: 'new_request',
                     message: data.message,
