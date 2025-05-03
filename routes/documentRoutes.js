@@ -11,7 +11,7 @@ const {
   updateRequest,
   deleteRequest,
   getCollaboratorRequests
-} = require("../controllers/requestController");
+} = require("../controllers/documentController");
 const auth = require("../middleware/auth");
 
 // Points de terminaison unifiés pour les demandes
@@ -22,6 +22,7 @@ router.post("/certif", auth, createcertif);
 router.get("/", auth, getAllRequests);
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);
+
 router.put("/:id", auth, updateRequest);
 router.delete("/:id", auth, deleteRequest);
 
