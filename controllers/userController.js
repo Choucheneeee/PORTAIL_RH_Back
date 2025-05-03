@@ -1,5 +1,5 @@
 const User = require("../models/User.model");
-const Request = require("../models/requests.model");  // ✅ Import the Request model
+const Request = require("../models/documents.model");  // ✅ Import the Request model
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 

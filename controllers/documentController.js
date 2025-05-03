@@ -1,5 +1,4 @@
-const Request = require("../models/requests.model");
-const Document = require("../models/documents.model");
+const Request = require("../models/documents.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate } = require("../utils/pdfGenerator");
@@ -41,7 +40,7 @@ exports.createfiche = async (req, res) => {
 
    
     
-    const newRequest = new Request(requestData);
+    const newRequest = new Document(requestData);
     await newRequest.save();
 
     const rhs = await User.find({ role: "rh" });
@@ -66,7 +65,7 @@ exports.createfiche = async (req, res) => {
 
 exports.getAllRequests = async (req, res) => {
   try {
-    const requests = await Request.find().populate('user', 'firstName lastName email');
+    const requests = await Request.find();
     res.status(200).json(requests);
   } catch (error) {
     res.status(500).json({ error: error.message });

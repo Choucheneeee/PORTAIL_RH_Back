@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
 const documentSchema = new mongoose.Schema({
+  user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
   type: {
     type: String,
     required: true,
@@ -10,20 +15,23 @@ const documentSchema = new mongoose.Schema({
       "certificat",
     ]
   },
+  firstName:String,
+  lastName:String,
   periode:{
     type:String,
     enum:[
-      "Mensuel",
+      "mensuel",
       "Annuel"
     ]
   },
   mois:String,
   annee:String,
-  requestDetails:String,
+ documenttDetails:String,
   status:String
 },
  {
   timestamps: true
 });
 
-module.exports = mongoose.model("Document", documentSchema);
+
+module.exports = mongoose.model("Request", documentSchema);
