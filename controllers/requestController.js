@@ -6,7 +6,6 @@ const { generateEmploymentCertificate,generateJobDescriptionCertificate,generate
 
 
 const Notification = require('../models/notifications.model');
-const io = require('../server').io;
 
 exports.createcertif=async(req,res)=>{
 
@@ -48,8 +47,15 @@ exports.createfiche = async (req, res) => {
     const rhs = await User.find({ role: "rh" });
     if (rhs.length > 0) {
       const rhsEmails = rhs.map(rh => rh.email);
-      await sendNotification(rhsEmails, user.firstName, user.lastName,userId, documentType,user.email);
-    }
+
+      await sendNotification(
+        rhsEmails,
+        user.firstName,
+        user.lastName,
+        userId, 
+        documentType,
+        user.email)
+          }
 
     res.status(201).json({ message: "Request submitted successfully", data: newRequest });
 
@@ -268,21 +274,23 @@ exports.deleteRequest = async (req, res) => {
 };
 
 // Email functions remain the same
-async function sendNotification(emails, firstName, lastName,id, type,email) {
+async function sendNotification(emails, firstName, lastName, id, type, email) { // Added 'io' as parameter
   try {
-    
+    console.log("emails",emails)
+    const io = require('../server').io;
+
+    console.log("io",io)
 
     const users = await User.find({ email: { $in: emails } });
-    
+    console.log("users",users)
     if (users.length === 0) {
       console.log('No users found for notification');
       return;
     }
     
-    const message = `New Request ${type} has been added:
-    🗓 ${new Date().toDateString()}
-    👤 ${firstName} ${lastName} (${email})
-      `;
+    const message = `📥 New ${type} request from ${firstName} ${lastName}
+🗓 ${new Date().toLocaleDateString()} ⏰ ${new Date().toLocaleTimeString()}
+📧 ${email} | 🆔 ${id.slice(-6)}`;
 
     const notifications = users.map(user => ({
       sender: id,
@@ -294,14 +302,15 @@ async function sendNotification(emails, firstName, lastName,id, type,email) {
 
     users.forEach(user => {
       const userRoom = `user_${user._id}`;
-      io.to(userRoom).emit('notif', {
-        type: 'new_request_added',
+      console.log("userRoom", userRoom);
+      io.to(userRoom).emit('notif', { 
+        type: 'new_request',
         message: message,
         timestamp: new Date().toISOString()
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${role} approval`);
+    console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
   } catch (error) {
     console.error('Error sending notifications:', error);
   }
