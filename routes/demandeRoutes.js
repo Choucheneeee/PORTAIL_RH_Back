@@ -1,6 +1,6 @@
 // Routes de gestion des demandes
 const express = require("express");
-const Request = require("../models/requests.model");
+const Request = require("../models/demande.model");
 const router = express.Router();
 const {
   createfiche,
@@ -11,7 +11,7 @@ const {
   updateRequest,
   deleteRequest,
   getCollaboratorRequests
-} = require("../controllers/documentController");
+} = require("../controllers/demandeController");
 const auth = require("../middleware/auth");
 
 // Points de terminaison unifiés pour les demandes

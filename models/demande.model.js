@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const documentSchema = new mongoose.Schema({
+const demandeSchema = new mongoose.Schema({
   user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -21,7 +21,7 @@ const documentSchema = new mongoose.Schema({
     type:String,
     enum:[
       "mensuel",
-      "Annuel"
+      "annuel"
     ]
   },
   mois:String,
@@ -34,4 +34,4 @@ const documentSchema = new mongoose.Schema({
 });
 
 
-module.exports = mongoose.model("Request", documentSchema);
+module.exports = mongoose.model("Demande", demandeSchema);

@@ -1,757 +1,556 @@
-const PdfPrinter = require('pdfmake');
-const nodemailer = require('nodemailer');
-
-const fonts = {
+const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
+const _ = require("lodash");
+const pdfMake = require("pdfmake/build/pdfmake");
+const pdfFonts = require("pdfmake/build/vfs_fonts");
+const path = require('path');
+pdfMake.vfs = pdfFonts.pdfMake ? pdfFonts.pdfMake.vfs : pdfFonts.vfs;
+pdfMake.fonts = {
   Roboto: {
-    normal: 'Helvetica',
-    bold: 'Helvetica-Bold',
-    italics: 'Helvetica-Oblique',
-    bolditalics: 'Helvetica-BoldOblique'
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Medium.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-MediumItalic.ttf'
   }
 };
-
-const printer = new PdfPrinter(fonts);
+// Configure email transporter
 const transporter = nodemailer.createTransport({
-  service: 'Gmail',
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   }
 });
 
-const generateEmploymentCertificate = async (user, request) => {
+// Number to Words Converters (Simplified versions)
+
+
+
+
+// Enhanced Payroll Calculator
+const TUNISIAN_RULES = {
+  // Social security
+  cnss: {
+    employeeRate: 0.0918, // 9.18%
+    employerRate: 0.1657, // 16.57%
+    maxBase: 1500 // Max monthly salary subject to CNSS
+  },
+  
+  // Income tax
+  irpp: {
+    brackets: [
+      { min: 0, max: 5000, rate: 0 },
+      { min: 5001, max: 20000, rate: 0.15 },
+      { min: 20001, max: 30000, rate: 0.20 },
+      { min: 30001, max: 50000, rate: 0.25 },
+      { min: 50001, max: Infinity, rate: 0.35 }
+    ],
+    professionalExpenses: 0.20, // 20% deduction
+    maxProfessionalExpenses: 1500 // Annual cap
+  },
+  
+  // Family allowances
+  family: {
+    maritalDeduction: 5, // Monthly deduction if married
+    perChildDeduction: 10, // Monthly per child
+    maxChildren: 6
+  },
+  
+  // Transport allowance
+  transport: {
+    exemptAmount: 20 // Non-taxable portion monthly
+  },
+  
+  // Other social contributions
+  contributions: {
+    professionalTraining: 0.01, // 1%
+    socialParticipation: 0.01 // 1%
+  }
+};
+
+const calculatePayroll = (user) => {
+  // Base salary components
+  const baseSalary = _.get(user, 'professionalInfo.salary', 0);
+  const transportAllowance = _.get(user, 'financialInfo.transportAllowance', 0);
+  
+  // Family situation
+  const isMarried = _.get(user, 'familyStatus.married', false);
+  const childrenCount = Math.min(
+    _.get(user, 'familyStatus.children', 0),
+    TUNISIAN_RULES.family.maxChildren
+  );
+
+  // 1. Calculate taxable transport allowance
+  const taxableTransport = Math.max(
+    transportAllowance - TUNISIAN_RULES.transport.exemptAmount,
+    0
+  );
+
+  // 2. Calculate gross salary components
+  const taxableGross = baseSalary + taxableTransport;
+  const nonTaxableGross = transportAllowance - taxableTransport;
+
+  // 3. Calculate CNSS (capped at max base)
+  const cnssBase = Math.min(taxableGross, TUNISIAN_RULES.cnss.maxBase);
+  const cnssEmployee = parseFloat((cnssBase * TUNISIAN_RULES.cnss.employeeRate).toFixed(3));
+
+  // 4. Calculate family deductions
+  const maritalDeduction = isMarried ? TUNISIAN_RULES.family.maritalDeduction : 0;
+  const childrenDeduction = childrenCount * TUNISIAN_RULES.family.perChildDeduction;
+  const totalFamilyDeduction = maritalDeduction + childrenDeduction;
+
+  // 5. Calculate professional expenses deduction (annual pro-rata)
+  const professionalExpenses = Math.min(
+    taxableGross * TUNISIAN_RULES.irpp.professionalExpenses,
+    TUNISIAN_RULES.irpp.maxProfessionalExpenses / 12
+  );
+
+  // 6. Calculate taxable income
+  const taxableIncome = taxableGross - cnssEmployee - professionalExpenses - totalFamilyDeduction;
+
+  // 7. Calculate IRPP
+  let annualTaxable = taxableIncome * 12;
+  let incomeTax = 0;
+
+  for (const bracket of TUNISIAN_RULES.irpp.brackets) {
+    if (annualTaxable <= bracket.min) break;
+    
+    const bracketAmount = Math.min(annualTaxable, bracket.max) - bracket.min;
+    incomeTax += bracketAmount * bracket.rate;
+  }
+
+  const monthlyIRPP = parseFloat((incomeTax / 12).toFixed(3));
+
+  // 8. Calculate social contributions
+  const professionalTraining = parseFloat((taxableGross * TUNISIAN_RULES.contributions.professionalTraining).toFixed(3));
+  const socialParticipation = parseFloat((taxableGross * TUNISIAN_RULES.contributions.socialParticipation).toFixed(3));
+
+  // 9. Total deductions
+  const totalDeductions = cnssEmployee + monthlyIRPP + professionalTraining + socialParticipation;
+
+  // 10. Net salary calculation
+  const net = parseFloat((
+    taxableGross + 
+    nonTaxableGross - 
+    totalDeductions
+  ).toFixed(3));
+
+  return {
+    gross: {
+      taxable: parseFloat(taxableGross.toFixed(3)),
+      nonTaxable: parseFloat(nonTaxableGross.toFixed(3)),
+      total: parseFloat((taxableGross + nonTaxableGross).toFixed(3))
+    },
+    deductions: {
+      cnssEmployee,
+      irpp: monthlyIRPP,
+      professionalTraining,
+      socialParticipation,
+      family: totalFamilyDeduction,
+      professionalExpenses
+    },
+    net
+  };
+};
+
+const calculatePayrollAnnuel = (user) => {
+  const monthly = calculatePayroll(user);
+  
+  // Annualize values
+  return {
+    gross: {
+      taxable: monthly.gross.taxable * 12,
+      nonTaxable: monthly.gross.nonTaxable * 12,
+      total: monthly.gross.total * 12
+    },
+    deductions: {
+      cnssEmployee: monthly.deductions.cnssEmployee * 12,
+      irpp: monthly.deductions.irpp * 12,
+      professionalTraining: monthly.deductions.professionalTraining * 12,
+      socialParticipation: monthly.deductions.socialParticipation * 12,
+      family: monthly.deductions.family * 12,
+      professionalExpenses: monthly.deductions.professionalExpenses * 12
+    },
+    net: monthly.net * 12
+  };
+};
+
+const generateFichePaiAnnuel = async (user, request, annee) => {
   try {
+    if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
+      throw new Error('Informations professionnelles incomplètes');
+    }
+
+    const payrollData = calculatePayrollAnnuel(user);
+    
+    // Calculate employer contributions
+    const employerCNSS = (user.professionalInfo.salary * 0.2218 * 12).toFixed(3);
+    const totalPatronal = (parseFloat(payrollData.deductions.cnssEmployee) + parseFloat(employerCNSS)).toFixed(3);
+
     const docDefinition = {
-      pageMargins: [40, 120, 40, 80],
+      pageMargins: [20, 120, 20, 60],
       header: {
         columns: [
           { 
-            image: 'logo.jpeg',
-            width: 100,
-            margin: [40, 20, 0, 0]
+            image: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQDw8PEBAVEBANEA4OEBEVDQ8QEA0SFREWFhkXFxcYHTQgGBomJxUVITEhJikrLi8uFx8zRD8sNygtLisBCgoKDg0OGhAQGC0dHx0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLSstLS0tLS0tLS0tLSstLS0rLv/AABEIAMgAyAMBEQACEQEDEQH/xAAcAAEAAgMBAQEAAAAAAAAAAAAAAQYEBQcDAgj/xABHEAABAwICBQUNBQUIAwAAAAABAAIDBBEFIQYSEzFBByJRYXEXIzJCUlOBkZOhscHRFBYzQ+FicnOjshUkNDWCkqLwJVRV/8QAGgEBAAIDAQAAAAAAAAAAAAAAAAEEAgMFBv/EACoRAQACAgEDAwQBBQEAAAAAAAABAgMRBBIhMRMUQQUiMlFCFSMzQ2E0/9oADAMBAAIRAxEAPwDuKAgICAgICAgICAgICD5Dgdx3ZIPpAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQavSHFW0sD5TvAsweU47kFM0D0idt3wzOuKhxe0k7nk7kHRroJQEBAQEBAQEBAQEBAQEBQClAiUKO4lSCAgglByfTvG/tE+zYe9QXaP2ncT7kFcY8tIc02LTcHiCDf15IOx6LYwKuna/wAdvMkHQQN6DcoCAgICAgICAgICAgICCFB4eUs7GC7nBo6S4BTFJlhOSIa2bSWiZk6qjB/iBbIw3/TCc9GfRVkczBJE4PY7c4HIrC1Zq2VtFmSoZCAUFZ03xv7NT6rD32a7W9QtmepSOTlEIQb/AEOxk0tS25tFKQ2ToGdgUS6803FxuOYUD6QEBAQEBAQEBAQEEFPKJYeJ4jFTxOlleGsbvJ+XSsqUm06hhe8Vju5VpFylTSlzKQbFm4SEAyO9HihdTBwo/k5mblz8KTWV80pJllfIT5T3FXq4K18KU5rWYwWzojTDrl3bk0/yyn7H/wBRXn+VH3u7xZ+xa1XWREvKeVrGue42a0FxPQAg4zpFizquofKbhty2NvktBUwhrFIIChLqOgGN7eDYvN5YBbPe9l8ioFtQEBAQEBAQEBAQEHlNKGtLibBoJJ6AEiszOmNrRWNuEabaSvrp3WJFPGS2Nl99stY9a7vE48VjcuHyc83nUK2Ve1CnuflCiEz3SE+CHdeTP/LKfsf/AFFed5f5u9xPwWtV1oRKico2NarRSRnnPs6XPxRwQc8UwgUggIM7BcRdTTsmb4pGsPKad4UDtFFUtljZIw3bI0OHpUJZCAgICAgICAgICCl8qOJmChcxps6pIiH7vje66tcTH1WU+XfUOJLv1rpw5nuKWPl9NaSQACSbWABzv8VFrVrHdnWs2WXD9BMQmAcIdmDu2jgw+oqpfmY6xqFmnFtt1zQzC5KSjigktrs1r2NxmVxs9+qdw6+CnTDfLU3sHGMRbTQvmecmDIeUeAQcWrqt00r5Xm7pHFx9N8uxSh4IAHRmTw6b5KRsMXwiWlMe0H4rA9u/jw7UGvQEF75OcbsTSSHI3fESePFvzWKXQ0BAQEBAQEBAQEHJ+WafvtLH0Nkf6yB8l0/p9e7lc6dObFdeY7uVAp8RtMedOs8l+i7GQtrZW3klF4rjwGX39ptfsXD5fImZ1Dr8Xj9tujWXP8ujERCQkJSpHLuUHGttN9nYbxwHnEHJz7fJBUlKBBadAsE28+2eO9wEH95+8BBetKsHFXTuYPxG3dGf2hw9KDjsjS0lpFi0kEdBGRUiEHpTzOje17DZzCHNPQQVil2bR7FW1UDJQcyAHjyXgZhBtEBAQEBAQEBAQcg5ZB/e6c9MLvc/9V1vp/hyPqHlz1dWXN+EjoWvJ+DPHG5fpLBYgymgY3c2KMD0NC83kn75ehwx9kM5YNog1+NOmEEggbrSuGq3MDVvldBzN2hleSSYgSSSTtWcfSmxH3Kr/ND2jPqgluhNdcd6AzH5jOPYg6XgmGNpoGQs8Uc4+U7iUGwQUHS/RGWWfbUzARILvbrBtnDjmg0P3Kr/ADQ9oz6oH3Kr/ND2jPqgseheE11JKRJH3mQWd3xh1SBkQAgvSAgICAgICAgIOW8s9Mf7rLwBkjPpAI+C6XAt305fPq5guxby5KQomPt0mJ07lydY8KmjjYTeWnAjeONhkD6repef5OLott3eLl3Vbbqqt7LoITaUpsEBAugIFlImyBZBFkEoCAgICAgICAgqHKVhhnw+UtF3Q2mHY03PuVni5Om+1Tl06o24cvQx3jqcGY76QnYll4ZiU1M8SwSGN+4kcR1g5Fa8uGt4bKZZqsHdDxLzzfZMVX2ONv8Ad3T3RMS8832LE9jjT7y53RMS8832LE9jjR7y53RMS8832LE9jjPeXO6JiXnm+xYnscZ7y53RMS8832LE9jjPeXZFLylYg084xyDoMYb72rG30+vwzrzrR5WnBuVCB5DamMwk2GsOez3blUycG0eFrHzYnyvVFWRzNEkTw9jhkQbgqlak1nuvVyRMdmSsWSUSICAgICAgICAgIPOVgc0tIuCCCOlItpjavVGnCdOdGnUVQ4tHeJXF0R8m+ZaV3eJn6q6cTk4eidqyQr3aVJCjskUnYUIFKewh2EBDsKPCEpPdNZ02+j2kU9FIHxOJYTd8RJ1Hj5FVc3Fi8LOHPNJdx0bx2KtgbNGep7TbWjd0FcPLinHLtYsvXDcBa24QEBAQEBAQEBAQQgwsUw2KpidFM0OY8WIPx7VlTJNZa8mKLORaUcntRTF0lODPDwA/EYOziF1uPzYt2lyc/EmvhS3sINiCCN4IIPvV+uSsqU0tCFnuGOpRZOxqSybg0JuDRZNwgROhDQp8Ao3uDwseg2POo6tjiTspiI5RcWz3O7VT5eHqqt8bNNbO9RuBAI3EAhcGY12dys7jb7RklAQEBAQEBAQEEIgKCC1R48HafLV4lo9SVP40DHk8dUA+sLdXLavy0zgrZqu59hvmP5j/AKrL3ORj7ah3PsN8x/Mf9VPush7Wh3PsN8x/Mf8AVR7q6Pa0O59hvmP5j/qnurntaIdye4afySOyV/1SOVdHtKMGr5MaFw5hkjPVJre5wWyObeGFuHVStJ+T+opGmWN23ibmbNIewdY4q9g5sWnSnm4k0U1dGJ3ChMJU/CPlCxtG6s6zqX6A0FxDb4fTPPhBuzd2sOr8gvO8inTkmHe49t41gVf5WUqQQEBAQEBAQEBAQYuIVjYYnyvNmxgkoKr3Q6fzUn/FShHdDg81J/xTSUt5QYCQBFJckAeDmSbKELfTSazGuILS4A2Nri6D1sgIlBUDzlYC0gi4IIPqU0nTDJG4l+b8YgEdTURjcyWVo7A4helwTukPPZY1aWGt0w0ihMOy8kTyaBwPizPt6Q0rhc6NZHa4c7os2LYwKctDmEh24i1lxOVyvR7uthw+rOmD97I/Id7lTj6vRa/p1z72R+Q73KP6vQn6ddn4XjLKglrQWkC9jZW+NzozK2bjzibRX1eEoCkEBAQEEFBz3lIxm5bSMOTbPl6+gKRREQILXyf4Jt5tu8d7gIsD4z7ZKEupBBKAggoh4VlQ2Nj5HmzWNLiegAKaRtjknUS/N2I1O1mll8698nZrOv8ANelwxqkPO5J3MsdbZa4gUGnaOSWEtw8ut4cryPRYfIrg82d5Hb4VdY1lxug20RFuc3NvauHzuN6uOXW42X07KC4EZHIi4PaF5DLjmsvRYrbhC1622TLIoaoxSNePFOfWCrfEzzhtpX5GKMlXQ6SpbIxrwbhwuvY4MnXXbzmSvROnuFuYJUggICAg1+N4i2mp5JneIOaOl3AIOLVVQ6V75Hm7pHFzu0n4LJDyQe1HTOlkZGwXc9wA9agdpwXDm00LIWbmjM+U47yoSz0BBCIec0rWAucQ0AXJJsAoiJt2Ra0Vcl5Q9NRUXpaZ3ernavH5nUOpdbh8XXeXK5PJ6vDnpXV1rw5u0hPCN9wDo3kgD05KLz012zpG5fofRLD/ALPQ00NrFkYLv3nc4/FebzW3eZd/BXWOIbcrTPeFhStKKDZyCQDmyXv1OC8v9U4s1t1RDs8Hkx4lo1xYifLqf9FOuxv4WPRTEdV2xccnXLPjZd/6Ty/4S4/OwfK3gr0US5SVIICAgINbjOCxVbWslLtVpJAa/VuevpQaj7hUPRJ7X9E2H3BoeiT2v6JsZuE6LUtLJtY2u17WGs7WtfoRDeIkQEGDjNYYaeaYC5ijc8A8bBZUjc6a8ltV24Vj+ltXW3EkmrGTlGwlrPTbeu3g4tYjbiZeTa06aG6uxH6VZnYkB+qiY+TytvJ1gBq6tsjh3mmIe/oc4bm/96FS5nI1XS7xMHVZ3JoyXCmd93biNRpKJY1dRMmaWPFwfWtOXBXLGrNlMk0ncNZ916f9r/cqM/SsMrPv8p916f8Aa/3qP6Vi34PfZf2+49GoGkOGsC0gg6620+m4qTuIYX5mS8amW5aLLoRGlVKkEBAQEBAQEBAQEBBqNK/8DVfwZP6Vswf5IaM8T0vzt+nwXpKRGnnr/khZb2hICT2IjbdaM6Mz18gbG0tjBGvKQdVvZ0lVc/JrSOyzg482nu7ngODxUcDYIhYN3m2b3HeT1rhZck3l28WOKQ2awbRAQEBAQEBAQEBAQEBAQEBAQEGr0khc+jqWNBc50Tw0DeSQssVtX7teWJmrh0WiOIO3UknDeAOHWu5HLxxDiW41ps2tDycYhIRrNZEOlzwT6hvWu/Pr8NlOFafK3YLyYQR2dUyGcix1BzI/dvVPJzbW8LePhRHleqSlZE0MjaGNbkAAAAqVrzM912uOI8MhQyESICAgICAgICAgIIunwiUXUR/0A5N/oidpBQRdNibqInaRSCbHySo890fAAsu50xpKiSEpCRBF0RuE3U9iEXUdUJ1KUOwpQXTuRMIuhuE3UbSi6lD6RIgINJieOthlbHa97a5v4AJXOzc2Md+lZx8fqrttmPDgCMwRcK7S/XG4V7RqdNPimMPilETI9ckX4/JUOTy70v01hYxYYtG5eP8AbNT/AOq73rCOVm33hnHHxTPeWXheMCZxjc0skbYlpW7Dy+qdS15cHS2rjZXbTFY2r17tNTY+185itzb2a7yiFz683eTpWbceYrtuTuXRmflWjyr78dl13sZBr7NxabE9a5c82/qTSsLkcevTvaHY5UDM0rgO0rGeVmr5hEYK/ttMLxFs7NZuVjYg8Cr3Fz+rDTkx9MvLSDGI6OnfPIea3IAb3E7grmOnVKrkv0qlFpxXvAdHhcjmOzabuuR07lYnBX9q8Z7fplUWlmIPkjY/DHsa97WueS+zAeO5RfFSI8sqZrzPhuNJtKIaFjS+7pJDZkbRdzz9Fqx4epnfNEK8NNMQI1m4XIW8PCB+C3TgpDTGe8tno5prHVSGnljdT1A/LeDzuwlYXwTFdtlM0Sxcc0znhrH0kNIahzGtfk461iAd1llj41bV3aWOTkWjxDw++OJf/Jk9b/opnBj/AGx9fJvwz8V0krYhDs8PfLtImyPsT3px8TdvWNMNN+Wds19eGni5QKx0joW4c4yxi7mB7tZu7qyW6eNSI3tqryLzK1aNYrUVLHunpjTFrgGtcTzgRvVTJWsfK3S9pb0LBtQU+Bh4nWCGNzydwNh0lVuRmilWzFjm1ldghi2T3VDg2SoBcLnNo4WXJ9PdZtK5Np6tQzdF8QuDA52s6O+qfKat/Bzz/ja+Rin8ytt/aEP7h+ajN/6I2zx98Esp2P0wuNfMEg8x3D0Kxbl447TCvXDa3hgUL9vWbVg5jG2LrEXKq4LVyZdxDfk/t06ZZmkNcWtETPxJjqjqvxVnmZe3TVq4+L+UtRWwQRwta2RonhIdvzLt5VG9a1rufKxW1rTqPCwYLXieIO8YZOHWujxs0Xx6VM+Pos1OGOeJa0xtDnh2QJ384qlg/O2oWc0R0V7vWWprrHvDd3lArPNbLNJ7MaVx9ty9NFNXZvtfX1ztAeDrfBbPp+td2HKjU9kaZ4Ia2kfC06r7h7Cd2s3cOxdrFeKS52anVHZX6Sqx2JjYxRRO2bQ0O2zBrAC2663T6c/KtX1Inwl+lmIUr4zXUbY4ZXtj12SBxaSeIBUelW3iWXrTE94eFQ1smkLNrm1lOHQg7r6vvO9bI3GLs12tu+3QrDdZUYtK/wBEWhz7lDja2twySMATmYNNt5ZrN3+/1q7xtzSdqXJiIvEVQwuGkFQWDWeKW7R0uDG2HYsf9aP9jNGKY7f/AAMVsvz2fVYRFNN8zfa6Qk6rdYWcQC4dBsq8+Vj4UTR4f+fxH+E34xq3kn+3CljiOuXQAqflehKlL5KjekT3hpsRw6SeaO9hCwhxFzdx7OhUM2Cb22s48sVq2L6KM2uxpsLZtBW/0KxGmmclvhq8Qwh20jlpw1rmHnDwQ4FVsnDmt+qixTPPT02ekuHyOqo5stVrbOzzup9vacsWlHq9OOawzH4bEb3jbnv5oW/21J7zDVGa0T2a+gw+ankIZZ0Lje1+cz3Zqtg49sdpnTbfLF/yfVHhjzUPnmtllGASbD6rKnHmcnVZE5ft1DYPoIibmNtzv5oVi3Hpfy1RkvHhrqfDJIalz47bGTwm3zB6gquPjzjv28N9s0WrqfLEGH1ccsr4iwCV2tmeGa0Tgy1tNqts5cdqREvQxYictaPNTbHyLRpj1YYZ+CYa6BrtY6z3nWceBKucTB6cfc0ZskX8PnSFtXsT9jLBNrNsX+Da+a6GOK7+5UvvXZV9lpF5dP7vorO8Kv8A3d9nhLo3ita+JtdNEIIntkLWeE4jMcE9XHX8URjva3du9KtFPtQjlhk2FTB+HICdw4G3Ba8ebXnw2ZMO43DUtptIWgN2sDgMtY2ufcts2wz3019GXXZlYBolP9pFbiEwnnZcRtbfUj7MlrvmjXTVnTFO92ZUGAzDGJK06uxdEIxzjr3sButuyWM5fs6WUYvu6lrsq6xAQkmlVwjAZosVrKx2rsqiMNZZ13XGrvH+lb7ZImsQr1xavMrWFpWUoCCLKBKkQQgWUCVIiyx0CmAUgsQUgkiUEWSAspQWRMAWIWWSCyBZBKJEEIJQEH//2Q==',
+            width: 80,
+            margin: [20, 20, 0, 0]
           },
           {
             stack: [
-              { text: process.env.COMPANY_NAME, style: 'companyName' },
-              { text: 'Certificate of Employment', style: 'companySubheader' },
-              { text: process.env.COMPANY_ADDRESS, style: 'companyAddress' }
+              { text: process.env.COMPANY_NAME, style: 'companyHeader' },
+              { text: 'RELEVÉ ANNUEL DE RÉMUNÉRATION', style: 'documentTitle' },
+              { 
+                text: [
+                  `Affiliation CNSS: ${process.env.COMPANY_CNSS}`,
+                  `\nAnnée : ${annee} | Code APE: ${process.env.COMPANY_APE}`
+                ],
+                style: 'companyInfo'
+              }
             ],
             margin: [20, 25, 0, 0]
           }
         ]
       },
       content: [
-        { text: 'OFFICIAL EMPLOYMENT VERIFICATION', style: 'documentTitle' },
-        { text: '\n' },
+        // Employee Information Section
         {
-          text: [
-            { text: `${new Date().toLocaleDateString()}\n`, style: 'documentDate' },
-            { text: 'To Whom It May Concern:\n\n', style: 'salutation' },
-            
-            `This is to certify that `,{text:`${user.firstName} ${user.lastName}`, bold: true}, ,
-            `is duly employed with ${process.env.COMPANY_NAME} in the capacity of `,
-            { text: `${user.professionalInfo?.position || 'their current position'}, `, bold: true },
-            `assigned to the ${user.professionalInfo?.department || 'specified'} department.\n\n`,
-            
-            `Mr./Ms. ${user.lastName}  commenced employment with our organization on `,
-            { text: `${user.professionalInfo?.hiringDate?.toLocaleDateString() || '[start date]'}, `, bold: true },
-            `and has maintained an ${'Active'} employment status since that time. `,
-            `This verification is issued upon the employee's formal request for official purposes.\n\n`,
-            
-            { text: 'Position Details:\n', style: 'sectionHeader' },
-            `• Current Position: ${user.professionalInfo?.position || 'N/A'}\n`,
-            `• Department: ${user.professionalInfo?.department || 'N/A'}\n`,
-            `• Employment Type: Full-time Regular\n`,
-            `• Reporting Structure: ${process.env.COMPANY_NAME} Organizational Hierarchy\n\n`,
-            
-            { text: 'Certification Statement:\n', style: 'sectionHeader' },
-            `This document serves as official confirmation of employment status and may be used for `,
-            `verification purposes with financial institutions, government agencies, or other entities `,
-            `requiring proof of employment. The information contained herein is accurate as of the `,
-            `date of issuance and remains valid unless otherwise superseded.\n\n`,
-            
-            { text: 'Authorization & Verification:\n', style: 'sectionHeader' },
-            `This certificate bears the official digital signature of ${process.env.COMPANY_NAME} `,
-            `and includes a unique QR code containing encrypted employment verification details.`
+          columns: [
+            {
+              stack: [
+                { text: `Matricule : ${user._id || 'N/A'}`, style: 'employeeInfo' },
+                { text: `CIN : ${user.cin ? user.cin.toString().replace(/(\d{4})(\d{4})/, '****$2') : 'N/A'}`, style: 'employeeInfo' },
+                { text: `CNSS : ${user.financialInfo.CNSS.toString().replace(/(\d{3})(\d{5})/, '***$2')}`, style: 'employeeInfo' }
+              ]
+            },
+            {
+              stack: [
+                { text: `Poste : ${user.professionalInfo.position || 'N/A'}`, style: 'employeeInfo' },
+                { text: `Departemtn : ${user.professionalInfo.department || 'N/A'}`, style: 'employeeInfo' },
+                { text: `Situation familiale : ${user.socialInfo.maritalStatus || 'N/A'}`, style: 'employeeInfo' }
+              ]
+            }
           ],
-          style: 'mainContent'
+          margin: [0, 0, 0, 15]
         },
-        { text: '\n' },
+
+        // Earnings Breakdown
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'ÉLÉMENTS DE RÉMUNÉRATION', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'Salaire de base', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${(user.professionalInfo.salary * 12).toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Prime de transport', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${user.financialInfo.transportAllowance.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Total brut imposable', style: 'totalLabel' },
+                { text: 'Total brut', style: 'totalLabel' },
+                { text: `${(payrollData.gross.total || 0 *12).toFixed(3)} TND`, style: 'totalValue' }
+              ]
+            ]
+          }
+        },
+
+        // Deductions Section
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'COTISATIONS SOCIALES', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'CNSS employé (9.18%)', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.cnssEmployee.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'IRPP progressif', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.irpp.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Total déductions', style: 'totalLabel' },
+                { text: 'Total retenues', style: 'totalLabel' },
+                { text: `${(payrollData.deductions.cnssEmployee + payrollData.deductions.irpp).toFixed(3)} TND`, style: 'totalValue' }
+              ]
+            ],
+            margin: [0, 10]
+          }
+        },
+
+        // Employer Contributions
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'CONTRIBUTIONS PATRONALES', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'CNSS employeur (16.57%)', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${employerCNSS} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Formation professionnelle (1%)', style: 'itemLabel' },
+                { text: 'Montant annuel', style: 'itemValue' },
+                { text: `${(user.professionalInfo.salary * 0.01 * 12).toFixed(3)} TND`, style: 'itemValue' }
+              ]
+            ],
+            margin: [0, 10]
+          }
+        },
+
+        // Net Calculation
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [
+              [
+                { text: 'NET À PAYER', style: 'netHeader' },
+                { text: `${payrollData.net.toFixed(3)} TND`, style: 'netValue' }
+              ]
+            ],
+            margin: [0, 20]
+          }
+        },
+
+        // Legal Section
+        ,
+
+        // Signature Section
         {
           columns: [
             {
               text: [
-                { text: 'Authorized Signature\n', style: 'signatureLabel' },
+                { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                `${process.env.HR_MANAGER_NAME || 'HR Director'}\n`,
-                `${process.env.COMPANY_NAME}`
+                `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
+                { text: process.env.COMPANY_NAME, style: 'companyStamp' }
               ],
-              width: '*'
-            },
-          ],
-          margin: [0, 20, 0, 0]
-        }
-      ],
-      footer: {
-        columns: [
-          { 
-            text: `CONFIDENTIAL DOCUMENT | ${process.env.COMPANY_PHONE} | ${process.env.HR_EMAIL}`, 
-            fontSize: 8,
-            color: '#666666'
-          },
-          { 
-            text: `Valid through ${new Date().getFullYear()} | Page {{page}} of {{pages}}`, 
-            fontSize: 8,
-            alignment: 'right'
-          }
-        ],
-        margin: [40, 20]
-      },
-      styles: {
-        companyName: {
-          fontSize: 16,
-          bold: true,
-          color: '#2c3e50'
-        },
-        companySubheader: {
-          fontSize: 14,
-          color: '#4a4a4a',
-          margin: [0, 2, 0, 0]
-        },
-        companyAddress: {
-          fontSize: 10,
-          color: '#666666',
-          margin: [0, 5, 0, 0]
-        },
-        documentTitle: {
-          fontSize: 18,
-          bold: true,
-          color: '#1a237e',
-          alignment: 'center',
-          margin: [0, 10, 0, 15]
-        },
-        documentDate: {
-          fontSize: 12,
-          color: '#666666',
-          alignment: 'right'
-        },
-        salutation: {
-          fontSize: 12,
-          color: '#333333',
-          margin: [0, 0, 0, 10]
-        },
-        sectionHeader: {
-          fontSize: 13,
-          bold: true,
-          color: '#1a237e',
-          margin: [0, 10, 0, 5]
-        },
-        mainContent: {
-          fontSize: 12,
-          color: '#444444',
-          lineHeight: 1.6,
-          margin: [0, 0, 0, 10]
-        },
-        signatureLabel: {
-          fontSize: 11,
-          color: '#2c3e50',
-          bold: true,
-          margin: [0, 0, 0, 5]
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        lineHeight: 1.4
-      }
-    };
-
-    // Generate PDF
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', reject);
-      pdfDoc.end();
-    });
-
-    // Professional Email Template
-    const mailOptions = {
-      from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: `Official Employment Certificate - ${user.firstName} ${user.lastName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #2c3e50;">Employment Certificate Attached</h2>
-          <p>Dear ${user.firstName},</p>
-          <p>Please find attached your official employment certificate as requested.</p>
-          <p><strong>Document Details:</strong></p>
-          <ul>
-            <li>Issued Date: ${new Date().toLocaleDateString()}</li>
-            <li>Certificate Number: ${request._id.toString().slice(-8).toUpperCase()}</li>
-          </ul>
-          <p>This document contains sensitive information. Please handle it securely.</p>
-          <hr style="border: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 0.9em; color: #666;">
-            ${process.env.COMPANY_NAME}<br>
-            ${process.env.COMPANY_ADDRESS}<br>
-            Phone: ${process.env.COMPANY_PHONE}<br>
-            Email: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
-          </p>
-        </div>
-      `,
-      attachments: [{
-        filename: `Employment-Certificate-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }]
-    };
-    console.log("mail",mailOptions);
-    await transporter.sendMail(mailOptions);
-
-    return {
-      documentData: {
-        type: 'Employment Certificate',
-        certificateNumber: request._id.toString().slice(-8).toUpperCase(),
-        issuedDate: new Date(),
-        recipient: user.email
-      },
-      emailSent: true
-    };
-
-  } catch (error) {
-    console.error('Professional document generation failed:', error);
-    throw error;
-  }
-};
-const generateJobDescriptionCertificate = async (user, request) => {
-  try {
-    const docDefinition = {
-      pageMargins: [40, 140, 40, 80],
-      header: {
-        columns: [
-          { 
-            image: 'logo.jpeg',
-            width: 100,
-            margin: [40, 20, 0, 0]
-          },
-          { 
-            stack: [
-              { text: process.env.COMPANY_NAME, style: 'companyName' },
-              { text: 'OFFICIAL JOB DESCRIPTION', style: 'companyHeader' }
-            ],
-            margin: [20, 25, 0, 0]
-          }
-        ]
-      },
-      content: [
-        { text: 'POSITION DESCRIPTION DOCUMENT', style: 'documentTitle' },
-        { text: '\n' },
-        {
-          stack: [
-            // Employee Information Section
-            {
-              text: 'EMPLOYEE INFORMATION',
-              style: 'sectionHeader',
-              margin: [0, 0, 0, 10]
+              width: '50%'
             },
             {
               text: [
-                { text: 'Full Name: ', style: 'fieldLabel' },
+                { text: 'Signature salarié\n', style: 'signatureLabel' },
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
                 `${user.firstName} ${user.lastName}\n`,
-                { text: 'Position Title: ', style: 'fieldLabel' },
-                `${user.professionalInfo?.position || 'Not Specified'}\n`,
-                { text: 'Department: ', style: 'fieldLabel' },
-                `${user.professionalInfo?.department || 'Not Specified'}\n`,
-                { text: 'Effective Date: ', style: 'fieldLabel' },
-                `${user.professionalInfo?.jobDescription?.effectiveDate?.toLocaleDateString() || new Date().toLocaleDateString()}`
+                { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
               ],
-              style: 'fieldContent'
-            },
-
-            // Position Summary
-            {
-              text: 'POSITION SUMMARY',
-              style: 'sectionHeader',
-              margin: [0, 20, 0, 10]
-            },
-            {
-              text: [
-                `The ${user.professionalInfo?.position || 'this position'} role within `,
-                { text: `${process.env.COMPANY_NAME}'s `, bold: true },
-                `${user.professionalInfo?.department || 'specified department'} department `,
-                `requires a professional with demonstrated expertise in their field. `,
-                `This position entails the following key responsibilities and requirements:`
-              ],
-              style: 'paragraph'
-            },
-
-            // Key Responsibilities
-            {
-              text: 'KEY RESPONSIBILITIES',
-              style: 'sectionHeader',
-              margin: [0, 20, 0, 10]
-            },
-            {
-              ul: (user.professionalInfo?.jobDescription?.responsibilities || ['Not specified'])
-                .map(r => ({ text: r, style: 'listItem' })),
-              style: 'listContainer'
-            },
-
-            // Required Qualifications
-            {
-              text: 'REQUIRED QUALIFICATIONS',
-              style: 'sectionHeader',
-              margin: [0, 20, 0, 10]
-            },
-            {
-              ul: (user.professionalInfo?.jobDescription?.qualifications || ['Not specified'])
-                .map(q => ({ text: q, style: 'listItem' })),
-              style: 'listContainer'
-            },
-
+              width: '50%'
+            }
           ]
         }
       ],
-      footer: {
-        columns: [
-          { 
-            text: `CONFIDENTIAL DOCUMENT | ${process.env.COMPANY_ADDRESS} | ${process.env.COMPANY_PHONE}`, 
-            fontSize: 8,
-            color: '#666666',
-            margin: [40, 20, 0, 0]
-          },
-          { 
-            text: `Valid through ${new Date().getFullYear()} | Page 1 of 1`, 
-            fontSize: 8,
-            alignment: 'right',
-            margin: [0, 20, 40, 0]
-          }
-        ]
-      },
       styles: {
-        companyName: {
-          fontSize: 14,
-          color: '#333333',
-          bold: true,
-          margin: [0, 0, 0, 2]
-        },
-        documentTitle: {
-          fontSize: 20,
-          bold: true,
-          color: '#2c3e50',
-          alignment: 'center',
-          margin: [0, 0, 0, 15]
-        },
-        sectionHeader: {
-          fontSize: 14,
-          bold: true,
-          color: '#2c3e50',
-          border: [false, false, false, true],
-          borderColor: '#2c3e50',
-          borderWidth: 1,
-          padding: [0, 0, 5, 5]
-        },
-        fieldLabel: {
-          bold: true,
-          color: '#4a4a4a',
-          fontSize: 12,
-          margin: [0, 3, 0, 3]
-        },
-        fieldContent: {
-          fontSize: 12,
-          color: '#333333',
-          lineHeight: 1.5,
-          margin: [0, 0, 0, 15]
-        },
-        paragraph: {
-          fontSize: 12,
-          color: '#444444',
-          lineHeight: 1.6,
-          margin: [0, 0, 0, 15]
-        },
-        listContainer: {
-          margin: [20, 5, 0, 15]
-        },
-        listItem: {
-          fontSize: 12,
-          color: '#444444',
-          lineHeight: 1.5,
-          markerColor: '#2c3e50'
-        },
-        signatureLabel: {
-          bold: true,
-          color: '#2c3e50',
-          fontSize: 11,
-          margin: [0, 0, 0, 5]
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        lineHeight: 1.4
-      }
-    };
-
-
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', reject);
-      pdfDoc.end();
-    });
-
-    // Professional Email Template
-    const mailOptions = {
-      from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      cc: process.env.HR_EMAIL,
-      subject: `Official Job Description - ${user.firstName} ${user.lastName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
-          <div style="border-bottom: 2px solid #2c3e50; padding-bottom: 15px; margin-bottom: 25px;">
-            <img src="${process.env.COMPANY_LOGO_URL}" alt="Company Logo" style="max-height: 50px;">
-          </div>
-          <h2 style="color: #2c3e50; margin-bottom: 20px;">Job Description Document</h2>
-          <p>Dear ${user.firstName},</p>
-          <p>Please find attached your official job description document as requested.</p>
-          
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <p style="margin: 0;"><strong>Document Details:</strong></p>
-            <ul style="margin: 10px 0 0 20px;">
-              <li>Document Type: Position Description</li>
-              <li>Effective Date: ${new Date().toLocaleDateString()}</li>
-              <li>Reference Number: JD-${request._id.toString().slice(-8).toUpperCase()}</li>
-            </ul>
-          </div>
-
-          <p style="color: #666; font-size: 0.9em;">
-            <strong>Important:</strong> This document contains confidential employment information. 
-            Please ensure proper handling and storage according to company policies.
-          </p>
-
-          <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee;">
-            <p style="font-size: 0.9em; color: #666; margin: 5px 0;">
-              ${process.env.COMPANY_NAME}<br>
-              ${process.env.COMPANY_ADDRESS}<br>
-              HR Department: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
-            </p>
-          </div>
-        </div>
-      `,
-      attachments: [{
-        filename: `Job-Description-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }]
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    return {
-      documentData: {
-        type: 'Job Description',
-        referenceNumber: `JD-${request._id.toString().slice(-8).toUpperCase()}`,
-        effectiveDate: new Date(),
-        recipient: user.email
-      },
-      emailSent: true
-    };
-
-  } catch (error) {
-    console.error('Professional document generation failed:', error);
-    throw error;
-  }
-};
-
-const generateWorkTransferRequest = async (user, request) => {
-  try {
-    console.log("request",request);
-    const docDefinition = {
-      pageOrientation: 'portrait',
-      pageMargins: [40, 120, 40, 60],
-      header: {
-        columns: [
-          { 
-            image: 'logo.jpeg', // Add actual logo buffer or remove
-            width: 100,
-            margin: [40, 20, 0, 0]
-          },
-          { 
-            text: [
-              { text: 'New Position: ', bold: true },
-              `${request.details.newPosition || 'N/A'}\n\n`,
-              { text: 'New Department: ', bold: true },
-              `${request.details.newDepartment || 'N/A'}\n\n`,
-              { text: 'Effective Date: ', bold: true },
-              `${new Date(request.details.effectiveDate).toLocaleDateString() || 'N/A'}\n\n`,
-              { text: 'Transfer Reason: ', bold: true },
-              `${request.details.reason || 'Not specified'}`
-            ],
-            style: 'employeeDetails',
-            margin: [20, 25, 0, 0]
-          }
-        ]
-      },
-      content: [
-        { 
-          text: 'EMPLOYEE WORK TRANSFER AUTHORIZATION', 
-          style: 'documentTitle',
-          margin: [0, 0, 0, 15]
-        },
-        {
-          text: 'This document serves as official authorization for the permanent transfer of employment within the organization, outlining the terms and conditions governing this transition. The transfer is subject to organizational policies and any applicable collective bargaining agreements.',
-          style: 'preambleText'
-        },
-        { text: '\n' },
-        {
-          style: 'sectionHeader',
-          table: {
-            widths: ['*'],
-            body: [
-              [{ text: '1. Employee Information', style: 'sectionHeaderText' }]
-            ]
-          }
-        },
-        {
-          text: [
-            { text: 'Employee Name: ', bold: true },
-            `${user.firstName || 'N/A'} ${user.lastName || 'N/A'}\n`,
-
-            { text: 'Current Position: ', bold: true },
-            `${user.professionalInfo?.position || 'N/A'}\n`,
-            { text: 'Years of Service: ', bold: true },
-            `${calculateYearsOfService(user.professionalInfo.hiringDate)} years\n`,
-          ],
-          style: 'employeeDetails'
-        },
-        {
-          style: 'sectionHeader',
-          table: {
-            widths: ['*'],
-            body: [
-              [{ text: '2. Transfer Details', style: 'sectionHeaderText' }]
-            ]
-          }
-        },
-        {
-          text: [
-            `Effective ${new Date(request.updatedAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, `,
-            { text: `${user.firstName} ${user.lastName} `, bold: true },
-            `will be transferred from the current assignment in the `,
-            { text: `${user.professionalInfo?.department || 'current department'}, `, bold: true },
-            `to the new position within the `,
-            { text: `${request.details.newDepartment || 'new department'}. `, bold: true },
-            `This transfer constitutes a permanent reassignment of duties and responsibilities as outlined in the attached position description.`
-          ],
-          style: 'bodyText'
-        },
-        {
-          text: [
-            { text: '\nTransfer Rationale: ', bold: true, italics: true },
-            `${request.details.reason || 'Organizational needs require workforce realignment to better serve operational requirements.'} `,
-            `
-            This transfer has been approved through proper organizational channels and complies with all relevant labor regulations.`
-          ],
-          style: 'bodyText'
-        },
-        {
-          style: 'sectionHeader',
-          table: {
-            widths: ['*'],
-            body: [
-              [{ text: '3. Authorization & Acknowledgements', style: 'sectionHeaderText' }]
-            ]
-          }
-        },
-        {
-          text: [
-            'By signing below, all parties acknowledge understanding and acceptance of this transfer arrangement. The employee affirms commitment to a smooth transition, including proper handover of responsibilities and participation in any required orientation activities.\n\n',
-            '__________________________________________\n',
-            { text: 'Employee Signature', italics: true, fontSize: 10 }, '\n\n',
-            '__________________________________________\n',
-            { text: 'HR Representative Signature', italics: true, fontSize: 10 }, '\n\n',
-            '__________________________________________\n',
-            { text: 'Department Head Authorization', italics: true, fontSize: 10 }
-          ],
-          style: 'signatureBlock'
-        },
-        {
-          text: '*This document becomes valid only when all required signatures are complete and verified by Human Resources.',
-          style: 'disclaimerText'
-        }
-      ],
-      footer: function(currentPage, pageCount) {
-        return {
-          columns: [
-            { 
-              text: `CONFIDENTIAL - ${process.env.COMPANY_NAME} INTERNAL USE ONLY`, 
-              alignment: 'left', 
-              fontSize: 8,
-              color: '#666'
-            },
-            { 
-              text: `Page ${currentPage} of ${pageCount} | Issued: ${new Date().toLocaleDateString()}`, 
-              alignment: 'right', 
-              fontSize: 8,
-              color: '#666'
-            }
-          ],
-          margin: [40, 20]
-        };
-      },
-      styles: {
-        documentTitle: {
-          fontSize: 18,
-          bold: true,
-          alignment: 'center',
-          color: '#1a365d',
-          margin: [0, 10, 0, 5]
-        },
         companyHeader: {
           fontSize: 16,
           bold: true,
           color: '#2c3e50'
         },
-        documentSubHeader: {
-          fontSize: 14,
-          color: '#4a5568',
-          margin: [0, 5, 0, 5]
-        },
-        departmentHeader: {
-          fontSize: 12,
-          color: '#718096',
-          margin: [0, 0, 0, 10]
+        documentTitle: {
+          fontSize: 18,
+          bold: true,
+          color: '#1a237e',
+          margin: [0, 5]
         },
         sectionHeader: {
-          margin: [0, 15, 0, 10]
-        },
-        sectionHeaderText: {
+          fillColor: '#1a237e',
+          color: 'white',
           bold: true,
-          fontSize: 13,
-          color: '#ffffff',
-          fillColor: '#2c3e50',
-          margin: [10, 5, 10, 5]
-        },
-        employeeDetails: {
           fontSize: 12,
-          lineHeight: 1.4,
-          margin: [15, 10, 0, 15]
+          margin: [0, 5]
         },
-        bodyText: {
-          fontSize: 12,
-          lineHeight: 1.4,
-          margin: [15, 10, 0, 15],
-          alignment: 'justify'
-        },
-        signatureBlock: {
-          fontSize: 12,
-          lineHeight: 1.8,
-          margin: [15, 20, 0, 10]
-        },
-        disclaimerText: {
-          italics: true,
+        itemLabel: {
           fontSize: 10,
-          color: '#e53e3e',
-          margin: [15, 20, 0, 0]
+          color: '#444',
+          margin: [0, 3]
         },
-        preambleText: {
-          fontSize: 12,
-          lineHeight: 1.4,
-          alignment: 'justify',
-          margin: [0, 0, 0, 15]
+        itemValue: {
+          fontSize: 10,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'right'
+        },
+        totalLabel: {
+          fontSize: 11,
+          bold: true,
+          color: '#2c3e50',
+          margin: [0, 5]
+        },
+        totalValue: {
+          fontSize: 11,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'right'
+        },
+        netHeader: {
+          fontSize: 14,
+          bold: true,
+          color: '#1a237e'
+        },
+        netValue: {
+          fontSize: 16,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'right'
+        },
+        legalText: {
+          fontSize: 9,
+          color: '#666'
+        },
+        legalTextBold: {
+          fontSize: 9,
+          bold: true,
+          color: '#444'
+        },
+        legalTextSmall: {
+          fontSize: 8,
+          color: '#666',
+          italics: true
+        },
+        signatureLabel: {
+          fontSize: 10,
+          color: '#444',
+          margin: [0, 5]
+        },
+        companyStamp: {
+          fontSize: 9,
+          color: '#666',
+          italics: true
+        },
+        employeeStamp: {
+          fontSize: 9,
+          color: '#666',
+          italics: true
         }
       },
-      defaultStyle: {
-        font: 'Roboto'
+      footer: {
+        text: `Document généré électroniquement - Valide sans signature manuscrite (Art. 84 Code du Travail Tunisien)\n${process.env.COMPANY_ADDRESS} - Tél: ${process.env.COMPANY_PHONE}`,
+        alignment: 'center',
+        fontSize: 8,
+        color: '#666666',
+        margin: [20, 10]
       }
     };
 
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-      const pdfBuffer = await new Promise((resolve, reject) => {
-        const chunks = [];
-        pdfDoc.on('data', chunk => chunks.push(chunk));
-        pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-        pdfDoc.on('error', reject);
-        pdfDoc.end();
-      });
-  
-      // Professional Email Template
-      const mailOptions = {
-        from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        subject: `Official Work Transfer Certificate - ${user.firstName} ${user.lastName}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; color: #333;">
-            <h2 style="color: #2c3e50;">Employment Certificate Attached</h2>
-            <p>Dear ${user.firstName},</p>
-            <p>Please find attached your official employment certificate as requested.</p>
-            <p><strong>Document Details:</strong></p>
-            <ul>
-              <li>Issued Date: ${new Date().toLocaleDateString()}</li>
-              <li>Certificate Number: ${request._id.toString().slice(-8).toUpperCase()}</li>
-            </ul>
-            <p>This document contains sensitive information. Please handle it securely.</p>
-            <hr style="border: 1px solid #eee; margin: 20px 0;">
-            <p style="font-size: 0.9em; color: #666;">
-              ${process.env.COMPANY_NAME}<br>
-              ${process.env.COMPANY_ADDRESS}<br>
-              Phone: ${process.env.COMPANY_PHONE}<br>
-              Email: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
-            </p>
+    const pdfBuffer = await new Promise((resolve, reject) => {
+      const pdfDoc = pdfMake.createPdf(docDefinition);
+      pdfDoc.getBuffer(buffer => resolve(buffer));
+    });
+
+    const mailOptions = {
+      from: `"Ressources Humaines - ${process.env.COMPANY_NAME}" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      bcc: process.env.HR_EMAIL,
+      subject: `Relevé annuel de rémunération ${annee} - ${user.lastName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto;">
+          <div style="background: #1a237e; padding: 20px; color: white;">
+            <h2 style="margin: 0;">Votre relevé annuel ${annee}</h2>
           </div>
-        `,
-        attachments: [{
-          filename: `Employment-Certificate-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
-          content: pdfBuffer,
-          contentType: 'application/pdf'
-        }]
-      };
-      console.log("mail",mailOptions);
-      await transporter.sendMail(mailOptions);
-  
-      return {
-        documentData: {
-          type: 'Employment Certificate',
-          certificateNumber: request._id.toString().slice(-8).toUpperCase(),
-          issuedDate: new Date(),
-          recipient: user.email
-        },
-        emailSent: true
-      };
+          
+          <div style="padding: 20px; background: #f8f9fa;">
+            <p>Madame/Monsieur ${user.lastName},</p>
+            
+            <div style="margin: 20px 0;">
+              <h3 style="color: #1a237e;">Synthèse annuelle</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">Total brut:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${payrollData.gross.total.toFixed(3)} TND</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">Total cotisations:</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #dee2e6;">${(payrollData.deductions.cnssEmployee + payrollData.deductions.incomeTax).toFixed(3)} TND</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px;"><strong>Net à payer:</strong></td>
+                  <td style="padding: 8px;"><strong>${payrollData.net.toFixed(3)} TND</strong></td>
+                </tr>
+              </table>
+            </div>
+
+            <p>Votre document officiel est disponible en pièce jointe au format PDF.</p>
+
+            <footer style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6;">
+              <p style="font-size: 0.9em; color: #6c757d;">
+                Service des Ressources Humaines<br>
+                ${process.env.COMPANY_NAME}<br>
+                ${process.env.COMPANY_ADDRESS}<br>
+                Tél: ${process.env.COMPANY_PHONE}
+              </p>
+            </footer>
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: `Releve_Annuel_${annee}_${user.lastName}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf'
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      status: 'success',
+      annee: annee,
+      netAnnual: payrollData.net,
+      pdfGenerated: true
+    };
 
   } catch (error) {
-    console.error('Work transfer document generation failed:', error);
-    throw error;
+    console.error('Erreur génération relevé annuel:', error);
+    throw new Error(`Échec de génération: ${error.message}`);
   }
 };
 
-const generatePayslipRequest = async (user, request) => {
+// Main Payslip Generation Function
+const generateFichePaiMensuel = async (user, demande) => {
   try {
-    console.log("request",request);
+    // Validate required professional info
+    if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
+      throw new Error('Informations professionnelles incomplètes');
+    }
+
+    // Calculate monthly payroll
+    const payrollData = calculatePayroll(user);
+    
+    // Calculate employer contributions
+    const employerCNSS = (user.professionalInfo.salary * 0.2218).toFixed(3);
+    const totalPatronal = (parseFloat(payrollData.deductions.cnssEmployee) + parseFloat(employerCNSS)).toFixed(3);
+
     const docDefinition = {
-      pageOrientation: 'portrait',
-      pageMargins: [40, 120, 40, 60],
+      pageMargins: [20, 120, 20, 60],
       header: {
         columns: [
           { 
-            image: 'logo.jpeg',
-            width: 100,
-            margin: [40, 20, 0, 0]
+            image: 'data:image/jpeg;base64,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',
+            width: 80,
+            margin: [20, 20, 0, 0]
           },
-          { 
-            text: [
-              { text: 'PAYSLIP\n', style: 'headerTitle' },
+          {
+            stack: [
+              { text: process.env.COMPANY_NAME, style: 'companyHeader' },
+              { text: 'BULLETIN DE PAIE MENSUEL', style: 'documentTitle' },
               { 
                 text: [
-                  { text: 'Payment Period: ', bold: true },
-                  `${new Date(request.paydetails.periodStart).toLocaleDateString()} - `,
-                  `${new Date(request.paydetails.periodEnd).toLocaleDateString()}\n`,
-                  { text: 'Issued: ', bold: true },
-                  new Date().toLocaleDateString()
+                  `Affiliation CNSS: ${process.env.COMPANY_CNSS}`,
+                  `\nPériode : ${demande.mois} ${demande.annee} | Code APE: ${process.env.COMPANY_APE}`
                 ],
-                style: 'headerDetails'
+                style: 'companyInfo'
               }
             ],
             margin: [20, 25, 0, 0]
@@ -759,746 +558,321 @@ const generatePayslipRequest = async (user, request) => {
         ]
       },
       content: [
-        { text: 'EMPLOYEE PAYSLIP', style: 'documentTitle' },
-        { text: '\n' },
-    
         // Employee Information Section
         {
-          text: [
-            { text: 'Employee Information\n', style: 'sectionTitle' },
-            { text: 'Name: ', bold: true }, 
-            `${user.firstName} ${user.lastName}\n`,
-            { text: 'Position: ', bold: true }, 
-            `${user.professionalInfo?.position || 'N/A'}\n\n`,
-            
-            { text: 'Bank Details\n', style: 'subsectionHeader' },
-            { text: 'Account Number: ', bold: true }, 
-            `${user.financialInfo?.bankAccount || 'N/A'}\n`,
-            { text: 'Tax Identification: ', bold: true }, 
-            `${user.financialInfo?.taxId || 'N/A'}\n`
-          ],
-          style: 'employeeInfo'
-        },
-        { text: '\n' },
-    
-        // Compensation Breakdown
-        {
-          text: [
-            { text: 'Compensation Breakdown\n', style: 'sectionTitle' },
-            
-            { text: 'Earnings\n', style: 'subsectionHeader' },
-            `• Base Salary: ${formatCurrency(request.paydetails.basicSalary)}\n`,
-            `• Allowances: ${formatCurrency(request.paydetails.allowances)}\n`,
-            `• Overtime: ${formatCurrency(request.paydetails.overtime)}\n`,
-            { 
-              text: `Total Earnings: ${formatCurrency(request.paydetails.totalEarnings)}\n\n`,
-              style: 'totalAmount'
+          columns: [
+            {
+              stack: [
+                { text: `Matricule : ${user._id || 'N/A'}`, style: 'employeeInfo' },
+                { text: `CIN : ${user.cin ? user.cin.toString().replace(/(\d{4})(\d{4})/, '****$2') : 'N/A'}`, style: 'employeeInfo' },
+                { text: `CNSS : ${user.financialInfo.CNSS.toString().replace(/(\d{3})(\d{5})/, '***$2')}`, style: 'employeeInfo' }
+              ]
             },
-            
-            { text: 'Deductions\n', style: 'subsectionHeader' },
-            `• Tax Withheld: ${formatCurrency(request.paydetails.tax)}\n`,
-            `• Insurance Premiums: ${formatCurrency(request.paydetails.insurance)}\n`,
-            `• Other Deductions: ${formatCurrency(request.paydetails.otherDeductions)}\n`,
-            { 
-              text: `Total Deductions: ${formatCurrency(request.paydetails.totalDeductions)}\n\n`,
-              style: 'totalAmount'
-            },
-            
-            { text: 'Net Payable Amount\n', style: 'subsectionHeader' },
-            { 
-              text: formatCurrency(request.paydetails.netPay),
-              style: 'netPay'
+            {
+              stack: [
+                { text: `Poste : ${user.professionalInfo.position || 'N/A'}`, style: 'employeeInfo' },
+                { text: `Department : ${user.professionalInfo.department || 'N/A'}`, style: 'employeeInfo' },
+                { text: `Situation familiale : ${user.socialInfo.maritalStatus || 'N/A'}`, style: 'employeeInfo' }
+              ]
             }
           ],
-          style: 'compensationDetails'
+          margin: [0, 0, 0, 15]
         },
-        { text: '\n' },
-    
-        // Footer
+
+        // Earnings Breakdown
         {
-          text: [
-            { text: 'Important Notes:\n', style: 'footerHeader' },
-            { 
-              text: `• This is an electronically generated document requiring no signature\n`,
-              italics: true
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'ÉLÉMENTS DE RÉMUNÉRATION', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'Salaire de base', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${user.professionalInfo.salary.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Prime de transport', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${user.financialInfo.transportAllowance.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Total brut imposable', style: 'totalLabel' },
+                { text: 'Total brut', style: 'totalLabel' },
+                { text: `${payrollData.gross.total.toFixed(3)} TND`, style: 'totalValue' }
+              ]
+            ]
+          }
+        },
+
+        // Employee Deductions
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'RETENUES SALARIALES', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'CNSS employé (9.18%)', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.cnssEmployee.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'IRPP progressif', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.irpp.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Formation professionnelle (1%)', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.professionalTraining.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Participation sociale (1%)', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${payrollData.deductions.socialParticipation.toFixed(3)} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Total retenues', style: 'totalLabel' },
+                { text: 'Total déductions', style: 'totalLabel' },
+                { text: `${(payrollData.deductions.cnssEmployee + payrollData.deductions.irpp).toFixed(3)} TND`, style: 'totalValue' }
+              ]
+            ],
+            margin: [0, 10]
+          }
+        },
+
+        // Employer Contributions
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              [
+                { text: 'CONTRIBUTIONS PATRONALES', style: 'sectionHeader', colSpan: 3 }, {}, {},
+              ],
+              [
+                { text: 'CNSS employeur (22.18%)', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${employerCNSS} TND`, style: 'itemValue' }
+              ],
+              [
+                { text: 'Accident de travail (1%)', style: 'itemLabel' },
+                { text: 'Montant mensuel', style: 'itemValue' },
+                { text: `${(user.professionalInfo.salary * 0.01).toFixed(3)} TND`, style: 'itemValue' }
+              ]
+            ],
+            margin: [0, 10]
+          }
+        },
+
+        // Net Calculation
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [
+              [
+                { text: 'NET À PAYER', style: 'netHeader' },
+                { text: `${payrollData.net.toFixed(3)} TND`, style: 'netValue' }
+              ]
+            ],
+            margin: [0, 20]
+          }
+        },
+
+        // Legal Section
+    
+
+        // Signature Section
+        {
+          columns: [
+            {
+              text: [
+                { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
+                { text: process.env.COMPANY_NAME, style: 'companyStamp' }
+              ],
+              width: '50%'
             },
-            { 
-              text: `• Valid only when verified through ${process.env.COMPANY_NAME} HR system\n`,
-              italics: true
-            },
-            { 
-              text: `• Issued on ${new Date().toLocaleDateString()}`,
-              italics: true
+            {
+              text: [
+                { text: 'Signature salarié\n', style: 'signatureLabel' },
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                `${user.firstName} ${user.lastName}\n`,
+                { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
+              ],
+              width: '50%'
             }
-          ],
-          style: 'footerText'
+          ]
         }
       ],
       styles: {
-        headerTitle: {
-          fontSize: 18,
+        companyHeader: {
+          fontSize: 16,
           bold: true,
           color: '#2c3e50'
         },
-        headerDetails: {
-          fontSize: 10,
-          color: '#666',
-          lineHeight: 1.3
-        },
         documentTitle: {
-          fontSize: 16,
+          fontSize: 18,
           bold: true,
-          color: '#1a365d',
-          alignment: 'center',
-          margin: [0, 0, 0, 10]
+          color: '#1a237e',
+          margin: [0, 5]
         },
-        sectionTitle: {
+        sectionHeader: {
+          fillColor: '#1a237e',
+          color: 'white',
+          bold: true,
+          fontSize: 12,
+          margin: [0, 5]
+        },
+        itemLabel: {
+          fontSize: 10,
+          color: '#444',
+          margin: [0, 3]
+        },
+        itemValue: {
+          fontSize: 10,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'right'
+        },
+        totalLabel: {
+          fontSize: 11,
+          bold: true,
+          color: '#2c3e50',
+          margin: [0, 5]
+        },
+        totalValue: {
+          fontSize: 11,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'right'
+        },
+        netHeader: {
           fontSize: 14,
           bold: true,
-          color: '#ffffff',
-          background: '#2c3e50',
-          margin: [0, 5, 0, 10],
-          padding: [8, 5],
-          borderRadius: 3
+          color: '#1a237e'
         },
-        employeeInfo: {
-          fontSize: 12,
-          lineHeight: 1.6,
-          margin: [0, 0, 0, 15]
-        },
-        subsectionHeader: {
-          fontSize: 12,
-          bold: true,
-          color: '#2c3e50',
-          margin: [0, 10, 0, 5]
-        },
-        totalAmount: {
-          bold: true,
-          color: '#1a365d'
-        },
-        netPay: {
+        netValue: {
           fontSize: 16,
           bold: true,
-          color: '#1a365d',
-          background: '#f0f4f8',
-          padding: [8, 5],
-          borderRadius: 3
+          color: '#1a237e',
+          alignment: 'right'
         },
-        footerText: {
-          fontSize: 10,
-          color: '#666',
-          lineHeight: 1.4
+        legalText: {
+          fontSize: 9,
+          color: '#666'
         },
-        footerHeader: {
+        legalTextBold: {
+          fontSize: 9,
           bold: true,
-          color: '#2c3e50',
-          margin: [0, 0, 0, 5]
+          color: '#444'
+        },
+        legalTextSmall: {
+          fontSize: 8,
+          color: '#666',
+          italics: true
+        },
+        signatureLabel: {
+          fontSize: 10,
+          color: '#444',
+          margin: [0, 5]
+        },
+        companyStamp: {
+          fontSize: 9,
+          color: '#666',
+          italics: true
+        },
+        employeeStamp: {
+          fontSize: 9,
+          color: '#666',
+          italics: true
         }
       },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 12,
-        lineHeight: 1.4
+      footer: {
+        text: `Document généré électroniquement - Valide sans signature manuscrite (Art. 84 Code du Travail Tunisien)\n${process.env.COMPANY_ADDRESS} - Tél: ${process.env.COMPANY_PHONE}`,
+        alignment: 'center',
+        fontSize: 8,
+        color: '#666666',
+        margin: [20, 10]
       }
     };
 
-    // PDF generation and email code similar to work transfer function
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+    // PDF generation and email logic
     const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', reject);
-      pdfDoc.end();
+      const pdfDoc = pdfMake.createPdf(docDefinition);
+      pdfDoc.getBuffer(resolve);
     });
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME} Payroll Department" <${process.env.EMAIL_USER}>`,
+      from: `"Service Paie - ${process.env.COMPANY_NAME}" <${process.env.EMAIL_USER}>`,
       to: user.email,
-      subject: `Payslip - ${new Date(request.paydetails.periodStart).toLocaleDateString()} to ${new Date(request.paydetails.periodEnd).toLocaleDateString()}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #2c3e50;">Payslip Attached</h2>
-          <p>Dear ${user.firstName},</p>
-          <p>Please find attached your payslip for the period ${new Date(request.paydetails.periodStart).toLocaleDateString()} - ${new Date(request.paydetails.periodEnd).toLocaleDateString()}.</p>
-          <p><strong>Payment Summary:</strong></p>
-          <ul>
-            <li>Net Pay: ${formatCurrency(request.paydetails.netPay)}</li>
-            <li>Payment Date: ${new Date().toLocaleDateString()}</li>
-          </ul>
-          <hr style="border: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 0.9em; color: #666;">
-            ${process.env.COMPANY_NAME}<br>
-            ${process.env.COMPANY_ADDRESS}<br>
-            Payroll Department: <a href="mailto:${process.env.PAYROLL_EMAIL}">${process.env.PAYROLL_EMAIL}</a>
-          </p>
-        </div>
-      `,
+      subject: `Fiche de paie - ${demande.mois} ${demande.annee}`,
+      html: generateEmailTemplate(user, demande, payrollData),
       attachments: [{
-        filename: `Payslip-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
+        filename: `Fiche-Paie-${demande.mois}-${demande.annee}.pdf`,
+        content: pdfBuffer
       }]
     };
 
     await transporter.sendMail(mailOptions);
 
     return {
-      documentData: {
-        type: 'Payslip',
-        periodStart: request.paydetails.periodStart,
-        periodEnd: request.paydetails.periodEnd,
-        netPay: request.paydetails.netPay,
-        recipient: user.email
-      },
-      emailSent: true
+      status: 'success',
+      periode: `${demande.mois} ${demande.annee}`,
+      netSalary: payrollData.net,
+      pdfGenerated: true
     };
 
   } catch (error) {
-    console.error('Payslip generation failed:', error);
-    throw error;
+    console.error('Erreur génération fiche mensuelle:', error);
+    throw new Error(`Échec de génération: ${error.message}`);
   }
 };
 
-// Helper function
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'TND',
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3
-  }).format(amount);
-};
-function calculateYearsOfService(hireDate) {
-  const diff = new Date() - new Date(hireDate);
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
-}
+// Helper function for email template
+const generateEmailTemplate = (user, demande, payrollData) => `
+  <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 20px auto;">
+    <div style="border-bottom: 2px solid #1a237e; padding-bottom: 15px; margin-bottom: 25px;">
+      <h2 style="color: #1a237e; margin: 0;">Votre fiche de paie ${demande.mois} ${demande.annee}</h2>
+    </div>
+    
+    <p>Madame/Monsieur ${user.lastName},</p>
+    
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 5px;">
+      <h3 style="color: #1a237e; margin-top: 0;">Récapitulatif</h3>
+      <table style="width: 100%;">
+        <tr>
+          <td style="padding: 8px;">Net à payer :</td>
+          <td style="padding: 8px; font-weight: bold;">${payrollData.net.toFixed(3)} TND</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px;">Date de paiement :</td>
+          <td style="padding: 8px;">${new Date().toLocaleDateString('fr-TN')}</td>
+        </tr>
+      </table>
+    </div>
 
-const generateSalaryCertificate = async (user, request) => {
-  try {
-    const docDefinition = {
-      pageOrientation: 'portrait',
-      pageMargins: [40, 120, 40, 60],
-      header: {
-        columns: [
-          { 
-            image: 'logo.jpeg',
-            width: 100,
-            margin: [40, 20, 0, 0]
-          },
-          { 
-            text: [
-              { text: 'SALARY CERTIFICATE\n', style: 'headerTitle' },
-              { 
-                text: [
-                  { text: 'Certificate Number: ', bold: true },
-                  `${request._id.toString().slice(-8).toUpperCase()}\n`,
-                  { text: 'Issued Date: ', bold: true },
-                  new Date().toLocaleDateString()
-                ],
-                style: 'headerDetails'
-              }
-            ],
-            margin: [20, 25, 0, 0]
-          }
-        ]
-      },
-      content: [
-        { text: 'OFFICIAL SALARY CERTIFICATE', style: 'documentTitle' },
-        { text: '\n' },
+    <p style="margin-top: 25px;">Votre document officiel est disponible en pièce jointe au format PDF.</p>
 
-        // Employee Information
-        {
-          text: [
-            { text: 'This is to certify that:\n\n', style: 'certificateIntro' },
-            { text: 'Employee Name: ', bold: true }, 
-            `${user.firstName} ${user.lastName}\n`,
-            { text: 'Position: ', bold: true }, 
-            `${user.professionalInfo?.position || 'N/A'}\n`,
-            { text: 'Department: ', bold: true }, 
-            `${user.professionalInfo?.department || 'N/A'}\n`,
-            { text: 'Date of Joining: ', bold: true }, 
-            `${new Date(user.professionalInfo?.hiringDate).toLocaleDateString() || 'N/A'}\n\n`
-          ],
-          style: 'employeeInfo'
-        },
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+      <p style="font-size: 0.9em; color: #666;">
+        Service des Ressources Humaines<br>
+        ${process.env.COMPANY_NAME}<br>
+        ${process.env.COMPANY_ADDRESS}<br>
+        Tél: ${process.env.COMPANY_PHONE}
+      </p>
+    </div>
+  </div>
+`;
 
-        // Salary Details
-        {
-          text: [
-            { text: 'Current Salary Structure\n', style: 'sectionTitle' },
-            `As of ${new Date().toLocaleDateString()}, the monthly salary details are as follows:\n\n`,
-            { text: 'Basic Salary: ', bold: true }, 
-            `${formatCurrency(request.paydetails.basicSalary)}\n`,
-            { text: 'Allowances: ', bold: true }, 
-            `${formatCurrency(request.paydetails.allowances)}\n`,
-            { text: 'Fixed Deductions: ', bold: true }, 
-            `${formatCurrency(request.paydetails.totalDeductions)}\n\n`,
-            { text: 'Net Monthly Salary: ', bold: true }, 
-            { 
-              text: `${formatCurrency(request.paydetails.netPay)}\n`,
-              style: 'netSalary'
-            }
-          ],
-          style: 'salaryDetails'
-        },
-        { text: '\n' },
 
-        // Official Declaration
-        {
-          text: [
-            { text: 'Declaration\n', style: 'sectionTitle' },
-            `This certificate is issued at the request of the employee for official purposes. 
-            The information provided herein is true and accurate to the best of our records 
-            as of the date of issuance.\n\n`,
-            { text: 'Authorized Signatory\n', style: 'signatoryLabel' },
-            { text: `${process.env.COMPANY_NAME}\n`, style: 'companyName' },
-            { text: 'Human Resources Department\n', style: 'departmentName' }
-          ],
-          style: 'declarationText'
-        },
 
-        // Footer
-        {
-          text: [
-            { text: '\n' },
-            { text: process.env.COMPANY_ADDRESS, style: 'footerText' },
-            { text: `Contact: ${process.env.HR_EMAIL} | ${process.env.COMPANY_PHONE}`, style: 'footerContact' },
-            { text: 'This document is electronically verified and requires no physical signature', style: 'footerNote' }
-          ],
-          alignment: 'center'
-        }
-      ],
-      styles: {
-        headerTitle: {
-          fontSize: 18,
-          bold: true,
-          color: '#1a365d'
-        },
-        headerDetails: {
-          fontSize: 10,
-          color: '#666',
-          lineHeight: 1.3
-        },
-        documentTitle: {
-          fontSize: 16,
-          bold: true,
-          color: '#2c3e50',
-          alignment: 'center',
-          margin: [0, 0, 0, 10]
-        },
-        certificateIntro: {
-          fontSize: 12,
-          italic: true,
-          margin: [0, 0, 0, 10]
-        },
-        employeeInfo: {
-          fontSize: 12,
-          lineHeight: 1.6,
-          margin: [0, 0, 0, 15]
-        },
-        sectionTitle: {
-          fontSize: 14,
-          bold: true,
-          color: '#ffffff',
-          background: '#2c3e50',
-          margin: [0, 5, 0, 10],
-          padding: [8, 5],
-          borderRadius: 3
-        },
-        salaryDetails: {
-          fontSize: 12,
-          lineHeight: 1.5,
-          margin: [0, 0, 0, 15]
-        },
-        netSalary: {
-          bold: true,
-          color: '#1a365d',
-          fontSize: 14
-        },
-        declarationText: {
-          fontSize: 12,
-          lineHeight: 1.4
-        },
-        signatoryLabel: {
-          bold: true,
-          margin: [0, 15, 0, 5]
-        },
-        companyName: {
-          fontSize: 12,
-          bold: true,
-          color: '#2c3e50'
-        },
-        departmentName: {
-          fontSize: 11,
-          color: '#666'
-        },
-        footerText: {
-          fontSize: 10,
-          color: '#666'
-        },
-        footerContact: {
-          fontSize: 10,
-          color: '#1a365d'
-        },
-        footerNote: {
-          fontSize: 9,
-          italic: true,
-          color: '#999'
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 12,
-        lineHeight: 1.4
-      }
-    };
 
-    // PDF Generation
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', reject);
-      pdfDoc.end();
-    });
 
-    // Email Configuration
-    const mailOptions = {
-      from: `"${process.env.COMPANY_NAME} HR Department" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: `Salary Certificate - ${user.firstName} ${user.lastName}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #2c3e50;">Official Salary Certificate Attached</h2>
-          <p>Dear ${user.firstName},</p>
-          <p>Please find attached your official salary certificate as requested.</p>
-          <p><strong>Document Details:</strong></p>
-          <ul>
-            <li>Certificate Number: ${request._id.toString().slice(-8).toUpperCase()}</li>
-            <li>Issued Date: ${new Date().toLocaleDateString()}</li>
-          </ul>
-          <hr style="border: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 0.9em; color: #666;">
-            ${process.env.COMPANY_NAME}<br>
-            ${process.env.COMPANY_ADDRESS}<br>
-            HR Contact: <a href="mailto:${process.env.HR_EMAIL}">${process.env.HR_EMAIL}</a>
-          </p>
-        </div>
-      `,
-      attachments: [{
-        filename: `Salary-Certificate-${user.lastName}-${new Date().toISOString().split('T')[0]}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }]
-    };
 
-    await transporter.sendMail(mailOptions);
 
-    return {
-      documentData: {
-        type: 'Salary Certificate',
-        certificateNumber: request._id.toString().slice(-8).toUpperCase(),
-        issuedDate: new Date(),
-        recipient: user.email
-      },
-      emailSent: true
-    };
 
-  } catch (error) {
-    console.error('Salary certificate generation failed:', error);
-    throw error;
-  }
-};
-const generateTaxCertificate = async (user, request) => {
-  console.log("request",request);
-  try {
-    const docDefinition = {
-      pageOrientation: 'portrait',
-      pageMargins: [40, 120, 40, 60],
-      header: {
-        columns: [
-          { 
-            image: 'logo.jpeg',
-            width: 100,
-            margin: [40, 20, 0, 0]
-          },
-          { 
-            text: [
-              { text: 'TAX CERTIFICATE\n', style: 'headerTitle' },
-              { 
-                text: [
-                  { text: 'Fiscal Year: ', bold: true },
-                  `${new Date(request.paydetails.periodStart).getFullYear()}\n`,
-                  { text: 'Certificate ID: ', bold: true },
-                  `TX-${request._id.toString().slice(-8).toUpperCase()}`
-                ],
-                style: 'headerDetails'
-              }
-            ],
-            margin: [20, 25, 0, 0]
-          }
-        ]
-      },
-      content: [
-        { text: 'OFFICIAL TAX CERTIFICATE', style: 'documentTitle' },
-        { text: '\n' },
-
-        // Employee Information
-        {
-          text: [
-            { text: 'This is to certify that:\n\n', style: 'certificateIntro' },
-            { text: 'Name: ', bold: true }, 
-            `${user.firstName} ${user.lastName}\n`,
-            { text: 'Tax Identification Number: ', bold: true }, 
-            `${user.financialInfo?.taxId || 'N/A'}\n`,
-            
-            { text: 'Position: ', bold: true }, 
-            `${user.professionalInfo?.position || 'N/A'}\n`,
-            { text: 'Date of Employment: ', bold: true }, 
-            `${new Date(user.professionalInfo?.hiringDate).toLocaleDateString() || 'N/A'}\n\n`
-          ],
-          style: 'employeeInfo'
-        },
-
-        // Tax Details
-        {
-          text: [
-            { text: 'Tax Information\n', style: 'sectionTitle' },
-            { text: '\n' },
-            `For the fiscal year ${new Date(request.paydetails.periodStart).getFullYear()}, the following tax details are certified:\n\n`,
-            
-            { text: 'Total Annual Income: ', bold: true }, 
-            `${formatCurrency(request.paydetails.totalEarnings * 12)}\n`,
-            { text: 'Taxes Withheld: ', bold: true }, 
-            `${formatCurrency(request.paydetails.tax * 12)}\n`,
-            { text: 'Allowable Deductions: ', bold: true }, 
-            `${formatCurrency(request.paydetails.totalDeductions * 12)}\n\n`,
-            
-            { text: 'Net Taxable Income: ', bold: true }, 
-            { 
-              text: `${formatCurrency((request.paydetails.totalEarnings - request.paydetails.totalDeductions) * 12)}\n`,
-              style: 'netTaxable'
-            }
-          ],
-          style: 'taxDetails'
-        },
-        { text: '\n' },
-
-        
-        {
-          stack: [
-            { text: 'Income Breakdown', style: 'sectionTitle' },
-            {
-              ul: [
-                `Basic Salary: ${formatCurrency(request.paydetails.basicSalary)}/month`,
-                `Allowances: ${formatCurrency(request.paydetails.allowances)}/month`,
-                `Overtime: ${formatCurrency(request.paydetails.overtime)}/month`
-              ],
-              style: 'breakdownList'
-            }
-          ],
-          margin: [0, 0, 0, 10]
-        },
-        
-        // Deduction Details
-        {
-          stack: [
-            { text: 'Tax Deductions', style: 'sectionTitle' },
-            {
-              ul: [
-                `Income Tax: ${formatCurrency(request.paydetails.tax)}/month`,
-                `Social Security: ${formatCurrency(request.paydetails.insurance)}/month`,
-                `Other Deductions: ${formatCurrency(request.paydetails.otherDeductions)}/month`
-              ],
-              style: 'deductionList'
-            }
-          ],
-          margin: [0, 0, 0, 10]
-        },
-        { text: '\n' },
-
-        // Official Declaration
-        {
-          text: [
-            { text: 'Legal Declaration\n', style: 'sectionTitle' },
-            { text: '\n' },
-            `This document serves as official verification of tax information for ${new Date().getFullYear()} fiscal year.\n\n`,
-            `• Issued in accordance with national tax regulations\n`,
-            `• Valid for submission to tax authorities\n`,
-            `• Subject to audit verification\n\n`,
-            { text: 'Authorized Signatory\n', style: 'signatoryLabel' },
-            { text: `${process.env.COMPANY_NAME}\n`, style: 'companyName' },
-            { text: 'Finance Department\n', style: 'departmentName' }
-          ],
-          style: 'declarationText'
-        },
-
-        // Footer
-        {
-          text: [
-            { text: '\n' },
-            { text: process.env.COMPANY_ADDRESS, style: 'footerText' },
-            { text: `Tax Office Registration: ${process.env.TAX_REG_NUMBER}`, style: 'footerLegal' },
-            { text: 'This document contains sensitive financial information - Handle with confidentiality', style: 'footerWarning' }
-          ],
-          alignment: 'center'
-        }
-      ],
-      styles: {
-        headerTitle: {
-          fontSize: 18,
-          bold: true,
-          color: '#1a365d'
-        },
-        headerDetails: {
-          fontSize: 10,
-          color: '#666',
-          lineHeight: 1.3
-        },
-        documentTitle: {
-          fontSize: 16,
-          bold: true,
-          color: '#2c3e50',
-          alignment: 'center',
-          margin: [0, 0, 0, 10]
-        },
-        certificateIntro: {
-          fontSize: 12,
-          italic: true,
-          margin: [0, 0, 0, 10]
-        },
-        employeeInfo: {
-          fontSize: 12,
-          lineHeight: 1.6,
-          margin: [0, 0, 0, 15]
-        },
-        sectionTitle: {
-          fontSize: 14,
-          bold: true,
-          color: '#ffffff',
-          background: '#2c3e50',
-          margin: [0, 5, 0, 10],
-          padding: [8, 5],
-          borderRadius: 3
-        },
-        taxDetails: {
-          fontSize: 12,
-          lineHeight: 1.5,
-          margin: [0, 0, 0, 15]
-        },
-        netTaxable: {
-          bold: true,
-          color: '#1a365d',
-          fontSize: 14,
-          background: '#f0f4f8',
-          padding: [5, 3],
-          borderRadius: 2
-        },
-        breakdownList: {
-          fontSize: 12,
-          lineHeight: 1.4
-        },
-        deductionList: {
-          fontSize: 12,
-          lineHeight: 1.4
-        },
-        declarationText: {
-          fontSize: 12,
-          lineHeight: 1.4
-        },
-        signatoryLabel: {
-          bold: true,
-          margin: [0, 15, 0, 5]
-        },
-        companyName: {
-          fontSize: 12,
-          bold: true,
-          color: '#2c3e50'
-        },
-        departmentName: {
-          fontSize: 11,
-          color: '#666'
-        },
-        footerText: {
-          fontSize: 10,
-          color: '#666'
-        },
-        footerLegal: {
-          fontSize: 10,
-          color: '#1a365d'
-        },
-        footerWarning: {
-          fontSize: 9,
-          color: '#e53e3e',
-          bold: true
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 12,
-        lineHeight: 1.4
-      },
-    };
-
-    // PDF Generation
-    const pdfDoc = printer.createPdfKitDocument(docDefinition);
-    const pdfBuffer = await new Promise((resolve, reject) => {
-      const chunks = [];
-      pdfDoc.on('data', chunk => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', reject);
-      pdfDoc.end();
-    });
-
-    // Email Configuration
-    const mailOptions = {
-      from: `"${process.env.COMPANY_NAME} Finance Department" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: `Tax Certificate - FY ${new Date(request.paydetails.periodStart).getFullYear()}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; color: #333;">
-          <h2 style="color: #2c3e50;">Official Tax Certificate Attached</h2>
-          <p>Dear ${user.firstName},</p>
-          <p>Please find attached your tax certificate for fiscal year ${new Date(request.paydetails.periodStart).getFullYear()}.</p>
-          <p><strong>Document Details:</strong></p>
-          <ul>
-            <li>Certificate ID: TX-${request._id.toString().slice(-8).toUpperCase()}</li>
-            <li>Issued Date: ${new Date().toLocaleDateString()}</li>
-            <li>Tax Year: ${new Date(request.paydetails.periodStart).getFullYear()}</li>
-          </ul>
-          <hr style="border: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 0.9em; color: #666;">
-            ${process.env.COMPANY_NAME}<br>
-            ${process.env.COMPANY_ADDRESS}<br>
-            Tax Office Registration: ${process.env.TAX_REG_NUMBER}
-          </p>
-        </div>
-      `,
-      attachments: [{
-        filename: `Tax-Certificate-${user.lastName}-FY${new Date(request.paydetails.periodStart).getFullYear()}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf'
-      }]
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    return {
-      documentData: {
-        type: 'Tax Certificate',
-        certificateId: `TX-${request._id.toString().slice(-8).toUpperCase()}`,
-        fiscalYear: new Date(request.paydetails.periodStart).getFullYear(),
-        issuedDate: new Date(),
-        recipient: user.email
-      },
-      emailSent: true
-    };
-
-  } catch (error) {
-    console.error('Tax certificate generation failed:', error);
-    throw error;
-  }
-};
-module.exports = { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate };
+module.exports = {generateFichePaiMensuel,generateFichePaiAnnuel};
