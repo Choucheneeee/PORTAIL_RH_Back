@@ -1,8 +1,8 @@
-const Request = require("../models/documents.model");
+const Demande = require("../models/demande.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
-const { generateEmploymentCertificate,generateJobDescriptionCertificate,generateWorkTransferRequest,generatePayslipRequest,generateSalaryCertificate,generateTaxCertificate } = require("../utils/pdfGenerator");
-
+const { generateFichePaiMensuel,generateFichePaiAnnuel } = require("../utils/pdfGenerator");
+const Document =require("../models/document.model")
 
 const Notification = require('../models/notifications.model');
 
@@ -40,7 +40,7 @@ exports.createfiche = async (req, res) => {
 
    
     
-    const newRequest = new Document(requestData);
+    const newRequest = new Demande(requestData);
     await newRequest.save();
 
     const rhs = await User.find({ role: "rh" });
@@ -65,7 +65,7 @@ exports.createfiche = async (req, res) => {
 
 exports.getAllRequests = async (req, res) => {
   try {
-    const requests = await Request.find();
+    const requests = await Demande.find();
     res.status(200).json(requests);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -98,125 +98,41 @@ exports.updateRequest = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const request = await Request.findById(id);
+    const request = await Demande.findById(id);
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
     }
     const user = await User.findById(request.user);
-    if (request.documentType === 'Payslip') {
-      if (request.paydetails.tax > request.paydetails.totalEarnings * 0.4) {
-        return res.status(404).json({ error: "Handle unreasonable tax rate" });
-      }
-    }
+      console.log("request",request)
+      if (status === 'Approuvé') {
 
-    if (request.requestType === 'Leave & Time-Off Requests') {
-      
-      // Original time-off balance logic
-      if (status === 'Accepted' && request.status !== 'Accepted') {
-        if (user.timeOffBalance < request.numberOfDays) {
-          return res.status(400).json({ error: 'Insufficient time off balance' });
-        }
-        user.timeOffBalance -= request.numberOfDays;
-        await user.save();
-      }
-      
-      if (status === 'Declined' && request.status === 'Accepted') {
-        user.timeOffBalance += request.numberOfDays;
-        await user.save();
-      }
-    }
-    else{
-      if (status === 'Accepted') {
-        switch(request.requestType) {
-          case 'Employment & Work Documents':
-            switch(request.documentType) {
-              case 'Employment Certificate':
-                docData = await generateEmploymentCertificate(user, request);
-                break;
-              case 'Job Description':
-                docData = await generateJobDescriptionCertificate(user, request);
-                break;
-              case 'Work Transfer Request':
-                docData = await generateWorkTransferRequest(user, request);
-                break;
-              default:
-                throw new Error(`Invalid document type for Employment & Work Documents: ${request.documentType}`);
-            }
+        switch(request.type=='fiche_paie') {
+          case (request.periode=="mensuel"):
+            docData = await generateFichePaiMensuel(user, request);
             break;
-  
-          case 'Payroll & Financial Documents':
-            switch(request.documentType) {
-              case 'Payslip':
-                docData = await generatePayslipRequest(user, request);
-                break;
-              case 'Salary Certificate':
-                docData = await generateSalaryCertificate(user, request);
-                break;
-              case 'Tax Certificate':
-                docData = await generateTaxCertificate(user, request);
-                break;
-              default:
-                throw new Error(`Invalid document type for Payroll & Financial Documents: ${request.documentType}`);
-            }
-            break;
-            case 'Leave & Time-Off Requests':
-            switch(request.documentType) {
-              case 'Paid Leave Request':
-                // docData = await generatePayslipRequest(user, request);
-                break;
-              case 'Sick Leave Request':
-                // docData = await generateSalaryCertificate(user, request);
-                break;
-              case 'Maternity/Paternity Leave':
-                // docData = await generateTaxCertificate(user, request);
-                break;
-              default:
-                throw new Error(`Invalid document type for Payroll & Financial Documents: ${request.documentType}`);
-            }
-            break;
-  
-          case 'HR & Administrative Requests':
-            switch(request.documentType) {
-              case 'Reference Letter':
-                docData = await generateReferenceLetter(user, request);
-                break;
-              case 'Resignation Request':
-                docData = await generateResignationDocument(user, request);
-                break;
-              case 'ID Badge Replacement':
-                docData = await generateIDBadgeDocument(user, request);
-                break;
-              default:
-                throw new Error(`Invalid document type for HR & Administrative Requests: ${request.documentType}`);
-            }
-            break;
-  
+            case (request.periode=="annuel"):
+              docData = await generateFichePaiAnnuel(user, request,request.annee);
+              break;
           default:
-            throw new Error(`Document generation not supported for request type: ${request.requestType}`);
+        throw new Error(`Document generation not supported for request periode : ${request.type} ${request.periode}`);
+
         }
+
   
         if (docData) {
           const document = new Document({
             ...docData,
-            type: request.documentType,
+            type: request.type,
             generatedFor: request._id,
             generatedBy: req.user.id,
-            accessRoles: ['employee', 'hr', 'manager']
           });
           await document.save();
           request.document = document._id;
         }
       }
 
-    }
     
-    
-
-
-    
-
-
-    const updatedRequest = await Request.findByIdAndUpdate(
+    const updatedRequest = await Demande.findByIdAndUpdate(
       id,
       { status, updatedAt: Date.now() },
       { new: true, runValidators: true }
@@ -224,12 +140,9 @@ exports.updateRequest = async (req, res) => {
 
     // Notification logic
     if (user) {
-      await sendUserNotification(
+      await sendNotificationUpdateDemande(
         user.email,
-        request.firstName,
-        request.lastName,
-        request.requestType,
-        request.documentType,
+        request.type,
         status
       );
     }
@@ -247,7 +160,55 @@ exports.updateRequest = async (req, res) => {
   }
 };
 
+async function sendNotificationUpdateDemande(emails, type,status) { // Added 'io' as parameter
+  try {
+    console.log("emails",emails)
+    const io = require('../server').io;
 
+    console.log("io",io)
+
+    const users = await User.find({ email: { $in: emails } });
+    if (users.length === 0) {
+      console.log('No users found for notification');
+      return;
+    } 
+    console.log("users",users)
+    console.log("emails",emails)
+    
+    const message = `📥 Votre demande ${type} a ete modifier ${status}
+🗓 ${new Date().toLocaleDateString('fr-FR', { 
+  day: '2-digit', 
+  month: 'short', 
+  year: 'numeric' 
+})} ⏰ ${new Date().toLocaleTimeString('fr-FR', { 
+  hour: '2-digit', 
+  minute: '2-digit' 
+})}
+📧 ${emails}}`;
+
+    const notifications = users.map(user => ({
+      sender: id,
+      recipient: user._id,
+      message: message
+    }));
+
+    await Notification.insertMany(notifications);
+
+    users.forEach(user => {
+      const userRoom = `user_${user._id}`;
+      console.log("userRoom", userRoom);
+      io.to(userRoom).emit('notif', { 
+        type: 'new_request',
+        message: message,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+  }
+}
 
 
 exports.deleteRequest = async (req, res) => {
@@ -321,3 +282,5 @@ async function sendNotification(emails, firstName, lastName, id, type, email) { 
     console.error('Error sending notifications:', error);
   }
 }
+
+

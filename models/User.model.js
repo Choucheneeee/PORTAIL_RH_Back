@@ -48,7 +48,8 @@ const UserSchema = new mongoose.Schema({
     taxId: String,
     CNSS:String,
     paymentMethod:String,
-    contractType:String
+    contractType:String,
+    transportAllowance:Number
   },
   professionalInfo: {
     position: String,

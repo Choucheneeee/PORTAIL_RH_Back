@@ -1,5 +1,5 @@
 const User = require("../models/User.model");
-const Request = require("../models/documents.model");  // ✅ Import the Request model
+const Request = require("../models/demande.model");  // ✅ Import the Request model
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
@@ -37,8 +37,7 @@ const updateuser = async (req, res) => {
         req.body.professionalInfo.hiringDate.split('/').reverse().join('-')
       );
     }
-
-    // 3. Update user with all fields
+    console.log("userr",req.body)    // 3. Update user with all fields
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       req.body,
