@@ -31,132 +31,141 @@ const transporter = nodemailer.createTransport({
 const TUNISIAN_RULES = {
   // Social security
   cnss: {
-    employeeRate: 0.0918, // 9.18%
-    employerRate: 0.1657, // 16.57%
+    employeeRate: 0.0968, // 9.68% (2025)
+    employerRate: 0.1707, // 17.07% (2025)
     maxBase: 1500 // Max monthly salary subject to CNSS
   },
-  
-  // Income tax
+
+  // Income tax (IRPP) 2025
   irpp: {
     brackets: [
-      { min: 0, max: 5000, rate: 0 },
-      { min: 5001, max: 20000, rate: 0.15 },
-      { min: 20001, max: 30000, rate: 0.20 },
-      { min: 30001, max: 50000, rate: 0.25 },
-      { min: 50001, max: Infinity, rate: 0.35 }
+      { min: 0, max: 5000, rate: 0.00 },
+      { min: 5000.01, max: 10000, rate: 0.15 },
+      { min: 10000.01, max: 20000, rate: 0.25 },
+      { min: 20000.01, max: 30000, rate: 0.30 },
+      { min: 30000.01, max: 40000, rate: 0.33 },
+      { min: 40000.01, max: 50000, rate: 0.36 },
+      { min: 50000.01, max: 70000, rate: 0.38 },
+      { min: 70000.01, max: Infinity, rate: 0.40 }
     ],
-    professionalExpenses: 0.20, // 20% deduction
-    maxProfessionalExpenses: 1500 // Annual cap
+    professionalExpenses: 0.10, // 10%
+    maxProfessionalExpenses: 2000 // Annual cap
   },
-  
-  // Family allowances
+
+  // Family allowances (annual, for deduction)
   family: {
-    maritalDeduction: 5, // Monthly deduction if married
-    perChildDeduction: 10, // Monthly per child
+    maritalDeduction: 300, // annual
+    perChildDeduction: 100, // annual per child
     maxChildren: 6
   },
-  
+
   // Transport allowance
   transport: {
     exemptAmount: 20 // Non-taxable portion monthly
   },
-  
+
   // Other social contributions
   contributions: {
     professionalTraining: 0.01, // 1%
-    socialParticipation: 0.01 // 1%
+    socialParticipation: 0.01, // 1%
+    unemploymentInsuranceEmployee: 0.005, // 0.5% (new 2025)
+    unemploymentInsuranceEmployer: 0.005  // 0.5% (new 2025)
+  },
+  // Employer
+  employer: {
+    accidentAtWork: 0.01 // 1%
   }
 };
 
 const calculatePayroll = (user) => {
-  // Base salary components
   const baseSalary = _.get(user, 'professionalInfo.salary', 0);
   const transportAllowance = _.get(user, 'financialInfo.transportAllowance', 0);
-  
-  // Family situation
-  const isMarried = _.get(user, 'familyStatus.married', false);
-  const childrenCount = Math.min(
-    _.get(user, 'familyStatus.children', 0),
-    TUNISIAN_RULES.family.maxChildren
-  );
+  const isMarried = _.get(user, 'socialInfo.maritalStatus', '') === 'married';
+  const childrenCount = Math.min(_.get(user, 'socialInfo.children', 0), TUNISIAN_RULES.family.maxChildren);
 
-  // 1. Calculate taxable transport allowance
-  const taxableTransport = Math.max(
-    transportAllowance - TUNISIAN_RULES.transport.exemptAmount,
-    0
-  );
+  // 1. Transport imposable
+  const taxableTransport = Math.max(transportAllowance - TUNISIAN_RULES.transport.exemptAmount, 0);
+  const nonTaxableTransport = transportAllowance - taxableTransport;
 
-  // 2. Calculate gross salary components
+  // 2. Salaire brut imposable
   const taxableGross = baseSalary + taxableTransport;
-  const nonTaxableGross = transportAllowance - taxableTransport;
+  const totalGross = taxableGross + nonTaxableTransport;
 
-  // 3. Calculate CNSS (capped at max base)
+  // 3. CNSS (plafonnée à 1500)
   const cnssBase = Math.min(taxableGross, TUNISIAN_RULES.cnss.maxBase);
   const cnssEmployee = parseFloat((cnssBase * TUNISIAN_RULES.cnss.employeeRate).toFixed(3));
 
-  // 4. Calculate family deductions
-  const maritalDeduction = isMarried ? TUNISIAN_RULES.family.maritalDeduction : 0;
-  const childrenDeduction = childrenCount * TUNISIAN_RULES.family.perChildDeduction;
-  const totalFamilyDeduction = maritalDeduction + childrenDeduction;
+  // 4. Unemployment insurance (employee)
+  const unemploymentInsuranceEmployee = parseFloat((taxableGross * TUNISIAN_RULES.contributions.unemploymentInsuranceEmployee).toFixed(3));
 
-  // 5. Calculate professional expenses deduction (annual pro-rata)
-  const professionalExpenses = Math.min(
-    taxableGross * TUNISIAN_RULES.irpp.professionalExpenses,
-    TUNISIAN_RULES.irpp.maxProfessionalExpenses / 12
+  // 5. Annual calculations for deductions
+  const annualBaseAfterCNSS = (taxableGross - cnssEmployee - unemploymentInsuranceEmployee) * 12;
+  const maritalDeductionAnnual = isMarried ? TUNISIAN_RULES.family.maritalDeduction : 0;
+  const childrenDeductionAnnual = childrenCount * TUNISIAN_RULES.family.perChildDeduction;
+  const totalFamilyDeductionAnnual = maritalDeductionAnnual + childrenDeductionAnnual;
+  const professionalExpensesAnnual = Math.min(
+    annualBaseAfterCNSS * TUNISIAN_RULES.irpp.professionalExpenses,
+    TUNISIAN_RULES.irpp.maxProfessionalExpenses
   );
 
-  // 6. Calculate taxable income
-  const taxableIncome = taxableGross - cnssEmployee - professionalExpenses - totalFamilyDeduction;
+  // 6. IRPP base
+  const annualTaxableIncome = annualBaseAfterCNSS - professionalExpensesAnnual - totalFamilyDeductionAnnual;
 
-  // 7. Calculate IRPP
-  let annualTaxable = taxableIncome * 12;
-  let incomeTax = 0;
-
+  // 7. IRPP calculation (progressive)
+  let incomeTaxAnnual = 0;
   for (const bracket of TUNISIAN_RULES.irpp.brackets) {
-    if (annualTaxable <= bracket.min) break;
-    
-    const bracketAmount = Math.min(annualTaxable, bracket.max) - bracket.min;
-    incomeTax += bracketAmount * bracket.rate;
+    if (annualTaxableIncome > bracket.min) {
+      const taxableInBracket = Math.min(annualTaxableIncome, bracket.max) - bracket.min;
+      incomeTaxAnnual += taxableInBracket * bracket.rate;
+    }
   }
+  const monthlyIRPP = parseFloat((incomeTaxAnnual / 12).toFixed(3));
 
-  const monthlyIRPP = parseFloat((incomeTax / 12).toFixed(3));
-
-  // 8. Calculate social contributions
+  // 8. Other social contributions
   const professionalTraining = parseFloat((taxableGross * TUNISIAN_RULES.contributions.professionalTraining).toFixed(3));
   const socialParticipation = parseFloat((taxableGross * TUNISIAN_RULES.contributions.socialParticipation).toFixed(3));
 
   // 9. Total deductions
-  const totalDeductions = cnssEmployee + monthlyIRPP + professionalTraining + socialParticipation;
+  const totalDeductions = cnssEmployee + unemploymentInsuranceEmployee + monthlyIRPP + professionalTraining + socialParticipation;
 
-  // 10. Net salary calculation
-  const net = parseFloat((
-    taxableGross + 
-    nonTaxableGross - 
-    totalDeductions
-  ).toFixed(3));
+  // 10. Net salary
+  const net = parseFloat((totalGross - totalDeductions).toFixed(3));
+
+  // Employer contributions (for info)
+  const cnssEmployer = parseFloat((cnssBase * TUNISIAN_RULES.cnss.employerRate).toFixed(3));
+  const unemploymentInsuranceEmployer = parseFloat((taxableGross * TUNISIAN_RULES.contributions.unemploymentInsuranceEmployer).toFixed(3));
+  const accidentAtWork = parseFloat((taxableGross * TUNISIAN_RULES.employer.accidentAtWork).toFixed(3));
+  const totalEmployer = cnssEmployer + unemploymentInsuranceEmployer + accidentAtWork;
 
   return {
     gross: {
       taxable: parseFloat(taxableGross.toFixed(3)),
-      nonTaxable: parseFloat(nonTaxableGross.toFixed(3)),
-      total: parseFloat((taxableGross + nonTaxableGross).toFixed(3))
+      nonTaxable: parseFloat(nonTaxableTransport.toFixed(3)),
+      total: parseFloat(totalGross.toFixed(3))
     },
     deductions: {
       cnssEmployee,
+      unemploymentInsuranceEmployee,
       irpp: monthlyIRPP,
       professionalTraining,
       socialParticipation,
-      family: totalFamilyDeduction,
-      professionalExpenses
+      familyAnnual: totalFamilyDeductionAnnual,
+      professionalExpensesAnnual
     },
-    net
+    net,
+    employerContributions: {
+      cnssEmployer,
+      unemploymentInsuranceEmployer,
+      accidentAtWork,
+      total: parseFloat(totalEmployer.toFixed(3))
+    }
   };
 };
 
+
 const calculatePayrollAnnuel = (user) => {
   const monthly = calculatePayroll(user);
-  
-  // Annualize values
+
   return {
     gross: {
       taxable: monthly.gross.taxable * 12,
@@ -166,14 +175,16 @@ const calculatePayrollAnnuel = (user) => {
     deductions: {
       cnssEmployee: monthly.deductions.cnssEmployee * 12,
       irpp: monthly.deductions.irpp * 12,
+      css: monthly.deductions.css * 12,
       professionalTraining: monthly.deductions.professionalTraining * 12,
       socialParticipation: monthly.deductions.socialParticipation * 12,
-      family: monthly.deductions.family * 12,
-      professionalExpenses: monthly.deductions.professionalExpenses * 12
+      familyAnnual: monthly.deductions.familyAnnual,
+      professionalExpensesAnnual: monthly.deductions.professionalExpensesAnnual
     },
     net: monthly.net * 12
   };
 };
+
 
 const generateFichePaiAnnuel = async (user, request, annee) => {
   try {
