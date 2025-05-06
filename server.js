@@ -183,6 +183,7 @@ app.use("/api/document", require("./routes/demandeRoutes"));
 app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/formation",require("./routes/formationRoutes"))
 
 app.get('/test-db', async (req, res) => {
     try {
