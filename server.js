@@ -3,12 +3,16 @@ const express = require("express");
 const cors = require("cors");
 const connectDB = require("./config/db");
 require("./routes/authRoutes");
+
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 const app = express();
 
 const path = require("path");
 const http = require('http');
 const server = http.createServer(app);
 const User = require("./models/User.model");
+ // Make sure this import exists
 
 connectDB().then(() => {
     startScheduledTasks();
@@ -21,6 +25,35 @@ const io = require('socket.io')(server, {
     credentials: true,
   },
 });
+
+const swaggerOptions  = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'Portail Rh Documentation',
+      version: '1.0.0',
+      description: 'Portail Rh documentation API Node.js backend',
+    },
+    servers: [
+      {
+        url: 'http://localhost:3000',
+        description: 'Development server',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  apis: ['./routes/*.js'], // Path to your route files
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 // Initialize scheduled tasks
 const startScheduledTasks = require('./utils/scheduledTasks');
@@ -174,7 +207,14 @@ app.get('/api/online-users', (req, res) => {
 
 app.use(cors("*"));
 app.use(express.json());
+
 app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
+
+app.use('/api-docs', 
+  swaggerUi.serve, 
+  swaggerUi.setup(swaggerSpec) // Use the generated specs
+);
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
@@ -201,6 +241,9 @@ app.get('/test-db', async (req, res) => {
   });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serveur en cours d'exécution sur le port ${PORT}`));
+server.listen(PORT, () => {
+    console.log('Swagger UI available at http://localhost:3000/api-docs');
+    console.log(`Serveur en cours d'exécution sur le port ${PORT}`)
+});
 
 module.exports = { io };
