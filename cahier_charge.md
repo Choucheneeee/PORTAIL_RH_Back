@@ -1,4 +1,3 @@
-```markdown
 # Cahier des Charges - Portail RH Modulaire
 
 ## 1. Introduction  
@@ -6,15 +5,73 @@
 - Une interaction fluide collaborateurs/RH  
 - La digitalisation des processus RH  
 - Une gestion sécurisée des données sensibles  
-- La génération automatisée de documents légaux  
+- La génération automatisée de documents  
 
 **Portail** :  
 - Public cible : Collaborateurs, Responsables RH, Administrateurs système  
-- Modules principaux : Authentification, Gestion des documents, Congés, Formations, Prêts, Tableaux de bord  
+- Modules principaux : Authentification, Gestion des documents, Formations, Messagerie, Notifications  
 
 ---
 
 ## 2. Exigences Fonctionnelles
+
+### 2.1 Module d'Authentification  
+- Connexion sécurisée via JWT  
+- Inscription avec validation email
+- Réinitialisation MDP par email  
+- Hiérarchie des rôles : Admin → RH → Collaborateur  
+
+### 2.2 Gestion des Profils  
+**Profil utilisateur** :  
+- Informations personnelles  
+- Informations professionnelles
+- Photo de profil  
+- Statut en ligne
+
+### 2.3 Module Documents  
+| Type Document      | Workflow                 | 
+|--------------------|--------------------------|
+| Fiche de paie     | Demande → Validation RH  | 
+| Attestation       | Demande → Validation RH  | 
+| Certificat        | Demande → Validation RH  | 
+
+### 2.4 Module Formation  
+- Demande de formation (interne/externe)
+- Validation par RH
+- Suivi des demandes
+- Notifications automatiques
+
+### 2.5 Communication
+- Messagerie instantanée entre utilisateurs
+- Système de notifications en temps réel
+- Suivi des statuts des demandes
+
+## 3. Exigences Techniques
+
+### 3.1 Stack Technologique  
+- **Frontend** : Angular  
+- **Backend** : Node.js/Express  
+- **Base de données** : MongoDB
+- **Temps réel** : Socket.IO  
+
+### 3.2 Sécurité  
+- Authentification JWT
+- Validation des rôles
+- Vérification par email
+- Sessions sécurisées
+
+### 3.3 Documentation  
+- API documentée avec Swagger
+- Documentation technique
+- Guide utilisateur
+
+### 3.4 Fonctionnalités Temps Réel
+- Notifications instantanées
+- Statut de connexion des utilisateurs
+- Messagerie en direct
+- Mises à jour des statuts des demandes
+
+---
 
 ### 2.1 Module d'Authentification  
 - Connexion sécurisée via JWT  
@@ -111,8 +168,5 @@ B -->|Approuve| C[Collaborateur]
 
 ---
 
-
 ---
-
-```
 
