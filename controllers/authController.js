@@ -64,6 +64,7 @@ exports.registerUser = async (req, res) => {
   }
 };
 
+// msg
 async function sendNotification(emails, firstName, lastName, role, email) {
   try {
     const Notification = require('../models/notifications.model');
