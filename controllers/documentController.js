@@ -1,8 +1,7 @@
-const Demande = require("../models/demande.model");
+const Demande = require("../models/document.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const { generateFichePaiMensuel,generateFichePaiAnnuel } = require("../utils/pdfGenerator");
-const Document =require("../models/document.model")
 
 const Notification = require('../models/notifications.model');
 
@@ -118,17 +117,6 @@ exports.updateRequest = async (req, res) => {
 
         }
 
-  
-        if (docData) {
-          const document = new Document({
-            ...docData,
-            type: request.type,
-            generatedFor: request._id,
-            generatedBy: req.user.id,
-          });
-          await document.save();
-          request.document = document._id;
-        }
       }
 
     

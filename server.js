@@ -219,7 +219,7 @@ app.use('/api-docs',
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
 app.use("/api/user", require("./routes/userRoutes"));
-app.use("/api/document", require("./routes/demandeRoutes"));
+app.use("/api/document", require("./routes/documentRoutes"));
 app.use("/api/message", require("./routes/messagesRoutes"));
 app.use("/api/notification", require("./routes/notificationRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));

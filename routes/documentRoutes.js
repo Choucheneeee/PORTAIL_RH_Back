@@ -1,6 +1,6 @@
 // Routes de gestion des demandes
 const express = require("express");
-const Request = require("../models/demande.model");
+const Request = require("../models/document.model");
 const router = express.Router();
 const {
   createfiche,
@@ -11,7 +11,7 @@ const {
   updateRequest,
   deleteRequest,
   getCollaboratorRequests
-} = require("../controllers/demandeController");
+} = require("../controllers/documentController");
 const auth = require("../middleware/auth");
 
 // Points de terminaison unifiés pour les demandes
@@ -30,8 +30,8 @@ router.delete("/:id", auth, deleteRequest);
 /**
  * @swagger
  * tags:
- *   name: Demandes
- *   description: Gestion des demandes des employés
+ *   name: Documents
+ *   description: Gestion des Documents des employés
  */
 
 /**
