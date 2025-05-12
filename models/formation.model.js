@@ -23,7 +23,9 @@ const formationSchema = new mongoose.Schema({
   description:String,
   organisme:String,
   cout:Number,
-  status:String
+  status:String,
+  firstName:String,
+  lastName:String
 },
  {
   timestamps: true

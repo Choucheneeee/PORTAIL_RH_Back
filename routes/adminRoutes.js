@@ -170,7 +170,7 @@ router.get("/dashData",authMiddleware,getData)
  *                 activeUsers:
  *                   type: integer
  *                   example: 35
- *                 pendingApprovals:
+ *                 en attenteApprovals:
  *                   type: integer
  *                   example: 7
  *                 recentRegistrations:

@@ -33,7 +33,7 @@ exports.createfiche = async (req, res) => {
       periode:periodType,
       mois:month,
       annee:year,
-      status: 'Pending',
+      status: 'en attente',
       requestDetails: description
     };
 
@@ -62,14 +62,7 @@ exports.createfiche = async (req, res) => {
   }
 };
 
-exports.getAllRequests = async (req, res) => {
-  try {
-    const requests = await Demande.find();
-    res.status(200).json(requests);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+
 
 exports.getCollaboratorRequests = async (req, res) => {
   try {

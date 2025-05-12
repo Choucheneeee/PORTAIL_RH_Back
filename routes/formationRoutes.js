@@ -100,7 +100,7 @@ router.post("/", auth, createformation);
  *         status:
  *           type: string
  *           description: Current status of the formation request
- *           example: "pending"
+ *           example: "en attente"
  *         createdAt:
  *           type: string
  *           format: date-time
@@ -143,7 +143,7 @@ router.post("/", auth, createformation);
  *           example: 1500.50
  *         status:
  *           type: string
- *           example: "pending"
+ *           example: "en attente"
  *   securitySchemes:
  *     bearerAuth:
  *       type: http

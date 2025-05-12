@@ -22,6 +22,8 @@ const congeSchema = new mongoose.Schema({
   date_Fin:String,
   motif:String,
   status:String,
+  firstName:String,
+  lastName:String
 },
  {
   timestamps: true

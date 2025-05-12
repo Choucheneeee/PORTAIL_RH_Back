@@ -170,7 +170,7 @@ exports.loginUser = async (req, res) => {
     }
 
     if (!user.isApproved) {
-      return res.status(403).json({ message: "Approval pending. Contact an admin." });
+      return res.status(403).json({ message: "Approval en attente. Contact an admin." });
     }
 
     // 5. Génération du token

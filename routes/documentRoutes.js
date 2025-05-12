@@ -1,12 +1,10 @@
 // Routes de gestion des demandes
 const express = require("express");
-const Request = require("../models/document.model");
 const router = express.Router();
 const {
   createfiche,
   createattestation,
   createcertif,
-  getAllRequests,
   getRequestById,
   updateRequest,
   deleteRequest,
@@ -19,7 +17,6 @@ router.post("/fiche", auth, createfiche);
 router.post("/attestation", auth, createattestation);
 router.post("/certif", auth, createcertif);
 
-router.get("/", auth, getAllRequests);
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);
 
