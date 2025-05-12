@@ -227,7 +227,7 @@ app.use("/api/formation",require("./routes/formationRoutes"));
 app.use("/api/conge", require("./routes/congeRoutes"));
 app.use("/api/avance", require("./routes/avanceRoute"));
 app.use("/api/demande", require("./routes/demandeRoutes"));
-
+app.use("/api/bot", require("./routes/botRoutes"));
 app.get('/test-db', async (req, res) => {
     try {
       const count = await User.countDocuments();
@@ -243,7 +243,7 @@ app.get('/test-db', async (req, res) => {
     }
   });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 server.listen(PORT, () => {
     console.log('Swagger UI available at http://localhost:3000/api-docs');
     console.log(`Serveur en cours d'exécution sur le port ${PORT}`)
