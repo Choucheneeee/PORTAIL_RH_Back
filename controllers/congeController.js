@@ -21,7 +21,9 @@ exports.createconge=async(req,res)=>{
                 date_Debut:date_Debut,
                 date_Fin:date_Fin,
                 motif:motif,
-                status: 'Pending',
+                firstName: user.firstName,
+                lastName: user.lastName,
+                status: 'en attente',
               };
             const newconge = new Conge(congeData);
             await newconge.save();

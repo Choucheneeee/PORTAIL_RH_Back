@@ -1,5 +1,8 @@
 const User = require("../models/User.model");
-const Request = require("../models/document.model");  // ✅ Import the Request model
+const Request = require("../models/document.model");
+const Formation = require("../models/formation.model");
+const Conge = require("../models/conge.model");
+const Avance = require("../models/avance.model");
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
@@ -76,9 +79,13 @@ exports.allusers = async (req, res) => {
     });
 
     const requests = await Request.countDocuments();
+    const formations = await Formation.countDocuments();
+    const conges = await Conge.countDocuments();
+    const avances = await Avance.countDocuments();
+
 
     const output = {
-      request: requests,
+      request: requests+formations+conges+avances,
       Numbercollaborators: verifiedUsers.length,
       collaborator: verifiedUsers,
       unverifiedUsers: unverifiedUsers,

@@ -21,7 +21,9 @@ exports.createformation=async(req,res)=>{
             date_Debut:date_Debut,
             date_Fin:date_Fin,
             description:description,
-            status: 'Pending',
+            firstName: user.firstName,
+            lastName: user.lastName,
+            status: 'en attente',
             organisme: organisme,
             cout:cout
           };

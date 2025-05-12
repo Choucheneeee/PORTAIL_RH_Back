@@ -18,6 +18,8 @@ const avanceSchema = new mongoose.Schema({
   motif:String,
 montant:Number,
   status:String,
+  firstName:String,
+  lastName:String
 },
  {
   timestamps: true

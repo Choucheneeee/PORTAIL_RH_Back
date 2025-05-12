@@ -226,6 +226,7 @@ app.use("/api/document", require("./routes/documentRoutes"));
 app.use("/api/formation",require("./routes/formationRoutes"));
 app.use("/api/conge", require("./routes/congeRoutes"));
 app.use("/api/avance", require("./routes/avanceRoute"));
+app.use("/api/demande", require("./routes/demandeRoutes"));
 
 app.get('/test-db', async (req, res) => {
     try {

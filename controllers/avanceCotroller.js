@@ -20,8 +20,10 @@ exports.createavance=async(req,res)=>{
                 type:type,
                 remboursement:repaymentPeriod,
                 motif:reason,
+                firstName: user.firstName,
+                lastName: user.lastName,
                 montant:amount,
-                status: 'Pending',
+                status: 'en attente',
               };
             const newavance = new Avance(avanceData);
             await newavance.save();
