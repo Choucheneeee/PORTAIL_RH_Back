@@ -9,6 +9,40 @@ exports.createcertif=async(req,res)=>{
 
 }
 exports.createattestation=async(req,res)=>{
+  try {
+    const { documentType, description } = req.body;
+    const userId = req.user.id;
+    if (!documentType) return res.status(400).json({ error: "Document type is required." });
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const requestData = {
+      user: userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      type:documentType,
+      status: 'En attente',
+      requestDetails: description
+    };
+    const newRequest = new Demande(requestData);
+    await newRequest.save();
+     const rhs = await User.find({ role: "rh" });
+    if (rhs.length > 0) {
+      const rhsEmails = rhs.map(rh => rh.email);
+
+      await sendNotification(
+        rhsEmails,
+        user.firstName,
+        user.lastName,
+        userId, 
+        documentType,
+        user.email)
+          }
+    res.status(201).json({ message: "Request submitted successfully", data: newRequest });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
   
 }
 exports.createfiche = async (req, res) => {
