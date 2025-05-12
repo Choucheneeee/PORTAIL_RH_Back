@@ -23,7 +23,7 @@ exports.createavance=async(req,res)=>{
                 firstName: user.firstName,
                 lastName: user.lastName,
                 montant:amount,
-                status: 'en attente',
+                status: 'En attente',
               };
             const newavance = new Avance(avanceData);
             await newavance.save();
