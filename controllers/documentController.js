@@ -33,7 +33,7 @@ exports.createfiche = async (req, res) => {
       periode:periodType,
       mois:month,
       annee:year,
-      status: 'en attente',
+      status: 'En attente',
       requestDetails: description
     };
 

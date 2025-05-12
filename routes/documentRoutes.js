@@ -20,7 +20,6 @@ router.post("/certif", auth, createcertif);
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);
 
-router.put("/:id", auth, updateRequest);
 router.delete("/:id", auth, deleteRequest);
 
 

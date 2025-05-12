@@ -23,7 +23,7 @@ exports.createconge=async(req,res)=>{
                 motif:motif,
                 firstName: user.firstName,
                 lastName: user.lastName,
-                status: 'en attente',
+                status: 'En attente',
               };
             const newconge = new Conge(congeData);
             await newconge.save();
