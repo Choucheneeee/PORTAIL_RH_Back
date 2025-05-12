@@ -13,9 +13,9 @@ const {
 const auth = require("../middleware/auth");
 
 // Points de terminaison unifiés pour les demandes
-router.post("/fiche", auth, createfiche);
+router.post("/fiche_paie", auth, createfiche);
 router.post("/attestation", auth, createattestation);
-router.post("/certif", auth, createcertif);
+router.post("/certificat", auth, createcertif);
 
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);

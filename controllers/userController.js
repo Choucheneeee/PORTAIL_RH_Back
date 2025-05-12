@@ -28,7 +28,7 @@ const updateuser = async (req, res) => {
       req.body.profileImage = `/uploads/${req.file.filename}`;
     }
 
-    // 2. Convert date fields (now works with nested data from form-data)
+    // 2. Convert date fields
     if (req.body.personalInfo?.birthDate) {
       req.body.personalInfo.birthDate = new Date(
         req.body.personalInfo.birthDate.split('/').reverse().join('-')
@@ -40,21 +40,67 @@ const updateuser = async (req, res) => {
         req.body.professionalInfo.hiringDate.split('/').reverse().join('-')
       );
     }
-    console.log("userr",req.body)    // 3. Update user with all fields
+
+    // 3. Handle contract type and end date
+    if (req.body.financialInfo?.contractType) {
+      // Validate contract type
+      if (!['CDI', 'CDD'].includes(req.body.financialInfo.contractType)) {
+        return res.status(400).json({
+          error: 'Contract type must be either CDI or CDD'
+        });
+      }
+
+      // Handle contract end date for CDD
+      if (req.body.financialInfo.contractType === 'CDD') {
+        if (!req.body.financialInfo.contractEndDate) {
+          return res.status(400).json({
+            error: 'Contract end date is required for CDD contracts'
+          });
+        }
+
+        // Convert contract end date
+        const endDate = new Date(req.body.financialInfo.contractEndDate);
+        const hiringDate = req.body.professionalInfo?.hiringDate ? 
+          new Date(req.body.professionalInfo.hiringDate) :
+          (await User.findById(userId)).professionalInfo.hiringDate;
+
+        if (endDate <= hiringDate) {
+          return res.status(404).json({
+            error: 'Contract end date must be after hiring date'
+          });
+        }
+
+        req.body.financialInfo.contractEndDate = endDate;
+      } else {
+        // For CDI, explicitly set contractEndDate to null
+        req.body.financialInfo.contractEndDate = null;
+      }
+    }
+
+    // 4. Update user with all fields
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      req.body,
-      { new: true, runValidators: true }
+      { $set: req.body },
+      { 
+        new: true, 
+        runValidators: true,
+        context: 'query'
+      }
     );
 
     if (!updatedUser) {
-      return res.status(404).send('User not found');
+      return res.status(404).json({
+        error: 'User not found'
+      });
     }
 
-    res.json(updatedUser);  // Return updated user data
+    res.json(updatedUser);
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Error updating user');
+    console.error('Update user error:', error);
+    res.status(500).json({
+      error: 'Error updating user',
+      details: error.message
+    });
   }
 };
 

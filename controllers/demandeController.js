@@ -3,6 +3,7 @@ const Formation = require("../models/formation.model");
 const Conge = require("../models/conge.model");
 const Avance = require("../models/avance.model");
 const User = require("../models/User.model");
+const { generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail } = require("../utils/pdfGenerator");
 
 
 
@@ -51,7 +52,6 @@ exports.updateRequest = async (req, res) => {
       default:
         return res.status(400).json({ error: "Invalid endpoint" });
     }
-    
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
     }
@@ -64,6 +64,32 @@ exports.updateRequest = async (req, res) => {
     if (request.status === 'Approuvé') {
       return res.status(400).json({ error: "Request already approved" });
     }
+
+    if (status === 'Approuvé' && endpoint === 'Document') {
+        switch(request.type) {
+            case 'fiche_paie':
+                if (request.periode === "mensuel") {
+                    docData = await generateFichePaiMensuel(user, request);
+                } else if (request.periode === "annuel") {
+                    docData = await generateFichePaiAnnuel(user, request, request.annee);
+                } else {
+                    throw new Error(`Période non supportée: ${request.periode}`);
+                }
+                break;
+            
+            case 'attestation':
+                docData = await generateAttestationTravail(user, request);
+                break;
+                
+            case 'certificat':
+                docData = await generateCertificat(user, request);
+                break;
+    
+            default:
+                throw new Error(`Type de document non supporté: ${request.type}`);
+        }
+    }
+    
     // Update the request status
     request.status = status;
     await request.save();
