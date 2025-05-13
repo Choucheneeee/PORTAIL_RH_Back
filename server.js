@@ -19,7 +19,7 @@ connectDB().then(() => {
 })
 const io = require('socket.io')(server, {
   cors: {
-    origin: 'http://localhost:4200',
+    origin: '*',
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true,
