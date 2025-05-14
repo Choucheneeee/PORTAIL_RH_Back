@@ -28,6 +28,29 @@ exports.sendMessage = async (req, res) => {
   }
 };
 
+exports.getalluser = async (req, res) => {
+  try {
+    const collaborator = await User.find({
+      role: "collaborateur",
+      isVerified: true,
+      isApproved: true
+    })
+    const rh = await User.find({
+      role: "rh",
+      isVerified: true,
+      isApproved: true
+    });
+    const output = {
+      collaborator: collaborator,
+      rh: rh
+    };
+    
+    res.json(output);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Get messages between two users
 exports.getMessages = async (req, res) => {
   try {

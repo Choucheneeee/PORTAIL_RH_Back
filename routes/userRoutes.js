@@ -1,6 +1,6 @@
 // Routes de gestion des utilisateurs
 const express = require("express");
-const { getuser, updateuser, allusers, approveUser, deleteuser } = require("../controllers/userController");
+const { getuser, updateuser, allusers, approveUser,getuserRh, deleteuser,updateuserRh,allusersRh } = require("../controllers/userController");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const upload = require('../utils/upload');
@@ -33,6 +33,7 @@ const nestFormatter = require('../utils/nestFormatter');
  */
 router.get("/getuser", authMiddleware, getuser);
 
+router.get("/getuserRh/:userId", authMiddleware, getuserRh);
 /**
  * @swagger
  * /users/allusers:
@@ -62,7 +63,9 @@ router.get("/getuser", authMiddleware, getuser);
  *               items:
  *                 $ref: '#/components/schemas/User'
  */
-router.get("/allusers", authMiddleware, allusers);
+// router.get("/allusers", authMiddleware, allusers);
+router.get("/rh/allusers", authMiddleware, allusersRh);
+
 
 /**
  * @swagger
@@ -100,6 +103,8 @@ router.get("/allusers", authMiddleware, allusers);
  *         description: Invalid input
  */
 router.put("/updateuser", authMiddleware, upload.single('profileImage'), nestFormatter, updateuser);
+
+router.put("/updateuser/:userId", authMiddleware, upload.single('profileImage'), nestFormatter, updateuserRh);
 
 /**
  * @swagger

@@ -11,7 +11,7 @@ router.use(authMiddleware);
 router.post('/', messageController.sendMessage);
 router.get('/:userId', messageController.getMessages);
 router.delete('/:messageId', messageController.deleteMessage);
-
+router.get('/rh/allusers', messageController.getalluser); // Route pour récupérer tous les messages
 
 /**
  * @swagger
