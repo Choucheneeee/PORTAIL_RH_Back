@@ -98,7 +98,7 @@ io.on('connection', (socket) => {
         userConnections.set(userId, true);
         io.emit('online-users', Array.from(userConnections.keys()));
     }
-
+    
     // Join rooms
     const userRoom = `user_${userId}`;
     socket.join(userRoom);
