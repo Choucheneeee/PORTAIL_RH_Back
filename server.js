@@ -19,12 +19,13 @@ connectDB().then(() => {
 })
 const io = require('socket.io')(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type'],
-    credentials: true,
+    origin: "http://localhost:4200", // Your Angular app URL
+    methods: ["GET", "POST"],
+    credentials: true
   },
+  path: '/socket.io'
 });
+
 
 const swaggerOptions  = {
   definition: {
@@ -73,41 +74,38 @@ io.use((socket, next) => {
     next();
   });
 
-  let onlineUsers = new Set(); // Suivre les IDs des utilisateurs au lieu des IDs de socket
+let userConnections = new Map(); // Map to track online users and their socket IDs
+let userSockets = new Map(); // Map to track user's socket connections
 
-
-  // Côté serveur (Socket.IO) avec suivi du statut en ligne
-let userConnections = new Map(); // Suit { userId: nombreDeConnexions }
-
+// Modify the socket connection handlers
 io.on('connection', (socket) => {
-    const userId = socket.userId;
-    console.log(`${socket.role} ${userId} connecté`);
+    const { userId, role } = socket.handshake.auth;
+    if (!userId || !role) {
+        socket.disconnect(true);
+        console.log("Authentification requise");
+        return;
+    }
+    console.log(`${role} ${userId} connecté`);
 
-    // Mettre à jour le nombre de connexions
-    const connections = userConnections.get(userId) || 0;
-    userConnections.set(userId, connections + 1);
-    
-    // Notifier UNIQUEMENT si c'était la première connexion
-    io.emit('online-users', Array.from(onlineUsers)); // Diffuser à tous les clients
+    // Store socket reference for this user
+    if (!userSockets.has(userId)) {
+        userSockets.set(userId, new Set());
+    }
+    userSockets.get(userId).add(socket.id);
 
-    if (connections === 0) {
+    // Add user to connections map only if they weren't already connected
+    if (!userConnections.has(userId)) {
+        userConnections.set(userId, true);
         io.emit('online-users', Array.from(userConnections.keys()));
     }
 
-    // Rejoindre la salle spécifique à l'utilisateur
+    // Join rooms
     const userRoom = `user_${userId}`;
     socket.join(userRoom);
-    console.log(`Utilisateur a rejoint la salle: ${userRoom}`);
-
-    if (socket.role === 'admin') {
-        socket.join('admins');
-        console.log(`Admin a rejoint la salle admins`);
-    }
-
-    if (socket.role === 'rh') {
-        socket.join('rhs');
-        console.log(`rh a rejoint la salle rhs`);
-    }
+    
+    if (role === 'admin') socket.join('admins');
+    if (role === 'rh') socket.join('rhs');
+    if (role === 'collaborateur') socket.join('collaborateurs');
 
     // Gestion des messages
     socket.on('chat-message', (data) => {
@@ -178,32 +176,80 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Gestion de la déconnexion
+    // Modify the disconnect handler
     socket.on('disconnect', () => {
-        console.log(`${socket.role} ${userId} déconnecté`);
+        console.log(`${role} ${userId} déconnecté`);
         
-        // Mettre à jour le nombre de connexions
-        const connections = userConnections.get(userId) || 1;
-        if (connections === 1) {
-            userConnections.delete(userId);
-        } else {
-            userConnections.set(userId, connections - 1);
+        const userSocketSet = userSockets.get(userId);
+        if (userSocketSet) {
+            userSocketSet.delete(socket.id);
+            
+            if (userSocketSet.size === 0) {
+                userSockets.delete(userId);
+                userConnections.delete(userId);
+                io.emit('online-users', Array.from(userConnections.keys()));
+            }
         }
-        
-        io.emit('online-users', Array.from(userConnections.keys()));
+
         socket.leave(userRoom);
-        if (socket.role === 'admin') socket.leave('admins');
+        if (role === 'admin') socket.leave('admins');
+        if (role === 'collaborateur') socket.leave('collaborateurs');
+        if (role === 'rh') socket.leave('rhs');
     });
+
+    // ...rest of your socket event handlers...
 });
   
-app.get('/api/online-users', (req, res) => {
+// Modify the existing /api/online-users endpoint
+app.get('/api/online-users', async (req, res) => {
     try {
-        res.json({ success: true, onlineUsers: onlineUsers.size });
+        // Get user details for online users
+        const onlineUserIds = Array.from(userConnections.keys());
+        const onlineUsers = await User.find({ _id: { $in: onlineUserIds } })
+            .select('nom prenom email role imageUrl'); // Select the fields you need
+
+        res.json(onlineUsers);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs en ligne' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erreur lors de la récupération des utilisateurs en ligne' 
+        });
     }
 });
 
+// Add new endpoint for updating online status
+app.post('/api/online-status', (req, res) => {
+    try {
+        const userId = req.user?._id; // Assuming you have authentication middleware
+        const { status } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Utilisateur non authentifié' 
+            });
+        }
+
+        if (status) {
+            // User is coming online
+            const connections = userConnections.get(userId) || 0;
+            userConnections.set(userId, connections + 1);
+        } else {
+            // User is going offline
+            userConnections.delete(userId);
+        }
+
+        // Emit updated online users list to all connected clients
+        io.emit('online-users', Array.from(userConnections.keys()));
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erreur lors de la mise à jour du statut' 
+        });
+    }
+});
 
 app.use(cors("*"));
 app.use(express.json());
