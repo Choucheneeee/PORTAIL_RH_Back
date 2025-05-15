@@ -168,5 +168,91 @@ B -->|Approuve| C[Collaborateur]
 
 ---
 
+## 6. Déploiement et Infrastructure
+
+### 6.1 Configuration Docker
+**Architecture des Conteneurs** :
+- Backend (Node.js/Express)
+- Base de données (MongoDB)
+
+**Configuration docker-compose.yml** :
+```yaml
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: portal-rh-backend
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URI: mongodb://mongo:27017/PortalRh
+      JWT_SECRET: [SECRET_KEY]
+      EMAIL_USER: [EMAIL]
+      EMAIL_PASS: [EMAIL_PASSWORD]
+      FRONTEND_URL: http://localhost:4200
+      COMPANY_NAME: [COMPANY_NAME]
+      COMPANY_ADDRESS: [ADDRESS]
+      COMPANY_PHONE: [PHONE]
+      COMPANY_MAT: [MATRICULE]
+      COMPANY_CNSS: [CNSS]
+      COMPANY_LOGO_URL: [LOGO_URL]
+    volumes:
+      - .:/usr/src/app
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:8.0
+    container_name: portal-rh-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+```
+
+### 6.2 Commandes Docker Essentielles
+```bash
+# Démarrer l'application
+docker-compose up -d
+
+# Arrêter l'application
+docker-compose down
+
+# Nettoyer et redémarrer (supprime les volumes)
+docker-compose down -v && docker-compose up -d
+
+# Voir les logs
+docker-compose logs -f
+
+# Reconstruire les conteneurs
+docker-compose build
+```
+
+### 6.3 Accès aux Services
+- API Backend : `http://localhost:3000`
+- MongoDB : `mongodb://localhost:27017`
+- MongoDB Compass : `mongodb://localhost:27017`
+
+### 6.4 Bonnes Pratiques de Développement
+- Utiliser `docker-compose down -v` lors du changement de branches
+- Surveiller les logs avec `docker-compose logs -f`
+- Les données MongoDB sont persistantes via le volume `mongo-data`
+- Le code source est monté en volume pour le développement
+
+### 6.5 Sécurité
+- MongoDB accessible uniquement dans le réseau Docker
+- Gestion des secrets via variables d'environnement
+- Authentification JWT configurée
+- Credentials email sécurisés
+
+### 6.6 Déploiement en Production
+- Gestion des secrets appropriée
+- Configuration de l'authentification MongoDB
+- Stratégie de backup pour le volume MongoDB
+- Configuration des logs et monitoring
+- Sécurité réseau appropriée
+
 ---
 
