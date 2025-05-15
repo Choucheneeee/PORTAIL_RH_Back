@@ -1,8 +1,9 @@
-import express from 'express';
-import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
-import { AzureKeyCredential } from "@azure/core-auth";
-import cors from 'cors';
-import dotenv from 'dotenv';
+const express = require('express');
+const ModelClient = require("@azure-rest/ai-inference").default;
+const { isUnexpected } = require("@azure-rest/ai-inference");
+const { AzureKeyCredential } = require("@azure/core-auth");
+const cors = require('cors');
+const dotenv = require('dotenv');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -74,7 +75,7 @@ Public cible : Collaborateurs, Responsables RH, Administrateurs
   respond always in french.
   If the user asks for information about a specific document management feature, provide a brief overview of the feature and how to use it.
   Descriptif du stage :
-Mettre en place un portail RH qui permet d’organiser l’interactivité entre les collaborateurs et leur
+Mettre en place un portail RH qui permet d'organiser l'interactivité entre les collaborateurs et leur
 hiérarchie.
 Pour les collaborateurs :
 - Créer un espace personnalisé avec un accès sécurisé ( spring security )
@@ -91,7 +92,7 @@ OnBoarding :
  Gestion des notifications ( temps réel : websocket )
  Gestion des rôles (admin / collaborateur)
 Tout ce projet sera basé sur des webservices, garantissant une architecture modulaire et une
-intégration transparente avec les outils existants de l’entreprise. Cela permettra une gestion centralisée
+intégration transparente avec les outils existants de l'entreprise. Cela permettra une gestion centralisée
 et une interopérabilité optimale entre les différentes composantes du système
 this is my model User:
 const mongoose = require("mongoose");
@@ -342,7 +343,7 @@ module.exports = mongoose.model("Avance", avanceSchema);
 `
 };
 
-export const sendMessage = async (req, res) => {
+const sendMessage = async (req, res) => {
   try {
     let { messages } = req.body;
     
@@ -354,7 +355,7 @@ export const sendMessage = async (req, res) => {
     const response = await client.path("/chat/completions").post({
       body: {
         messages: messages,
-        temperature: 0.7, // Reduced for more focused responses
+        temperature: 0.7,
         top_p: 0.9,
         model: model,
         max_tokens: 1000
@@ -366,8 +367,6 @@ export const sendMessage = async (req, res) => {
       return res.status(500).json({ error: "Unexpected response from the API" }); 
     }
 
-    // Clean and format the response
-    
     res.json({ 
       response: response.body.choices[0].message.content
     });
@@ -376,4 +375,6 @@ export const sendMessage = async (req, res) => {
     res.status(500).json({ error: "An error occurred while processing your request" });
   }
 };
+
+module.exports = { sendMessage };
 

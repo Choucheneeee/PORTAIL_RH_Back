@@ -8,10 +8,12 @@ exports.allusers = async (req, res) => {
 
     const verifiedUsers = await User.find({ 
       isVerified: true,
+      isApproved:true,
       role: "collaborateur"
     });
     const rh= await User.find({
       isVerified: true,
+      isApproved:true,
       role: "rh"
     });
     const admin= await User.find({  

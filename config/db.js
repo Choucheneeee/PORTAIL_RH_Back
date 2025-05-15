@@ -6,7 +6,11 @@ const bcrypt = require("bcryptjs");
 console.log(process.env.MONGO_URI);
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI,);
+    await mongoose.connect(process.env.MONGO_URI,{
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10,
+      socketTimeoutMS: 45000,
+    });
     console.log("✅ MongoDB connecté !");
     await getSystemUser();
 
@@ -23,7 +27,7 @@ async function getSystemUser() {
       firstName: 'System',
       lastName: 'User',
       email: 'system@system.com',
-      password: await bcrypt.hash('system_password', 10),
+      password: process.env.SYSTEM_PASSWORD,
       role: 'admin',
       isVerified: true,
       isApproved: true
