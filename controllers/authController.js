@@ -38,24 +38,14 @@ exports.registerUser = async (req, res) => {
     const name=firstName +" "+lastName
     await sendVerificationEmail(email, verificationCode,name);
     
-    if (role=="rh"){
-      const admins = await User.find({ role: "admin" });
+    const admins = await User.find({ role: "admin" });
     if (admins.length > 0) {
       const adminEmails = admins.map(admin => admin.email);
+      
       await sendNotification(adminEmails, user.firstName, user.lastName,user.role , user.email);
     }
-  }
-    else{
-      if(role=="collaborateur"){
-        const rhs = await User.find({ role: "rh" });
-    if (rhs.length > 0) {
-      const rhEmails = rhs.map(rh => rh.email);
-      console.log("rhemails",rhEmails)
-      await sendNotification(rhEmails, user.firstName, user.lastName, user.role, user.email);
-    }
-      }
-
-    }
+  
+    
     res.status(201).json({ message: "User registered. Check email for verification code." });
     
   } 
