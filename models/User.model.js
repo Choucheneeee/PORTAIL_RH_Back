@@ -3,10 +3,11 @@ const mongoose = require("mongoose");
 const UserSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
-  cin:{
-    type:Number,
-    unique:true,
-    require:true
+  cin: {
+    type: Number,
+    required: false,
+    default: null,
+    unique: false,
   },
   email: { 
     type: String, 
@@ -99,6 +100,13 @@ UserSchema.pre('save', function(next) {
     this.financialInfo.contractEndDate = undefined;
   }
   next();
+});
+
+// Add a compound index for cin that only applies when cin is not null
+UserSchema.index({ cin: 1 }, { 
+  unique: true,
+  sparse: true,
+  partialFilterExpression: { cin: { $type: "number" } }
 });
 
 module.exports = mongoose.model("User", UserSchema);
