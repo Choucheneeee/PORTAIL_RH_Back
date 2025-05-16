@@ -137,14 +137,14 @@ exports.updateuserRh = async (req, res) => {
     // 3. Handle contract type and end date
     if (req.body.financialInfo?.contractType) {
       // Validate contract type
-      if (!['CDI', 'CDD'].includes(req.body.financialInfo.contractType)) {
+      if (!['CDI', 'CDD',"Stage"].includes(req.body.financialInfo.contractType)) {
         return res.status(400).json({
-          error: 'Contract type must be either CDI or CDD'
+          error: 'Contract type must be either CDI or CDD or Stage'
         });
       }
 
       // Handle contract end date for CDD
-      if (req.body.financialInfo.contractType === 'CDD') {
+      if (req.body.financialInfo.contractType === 'CDD' || req.body.financialInfo.contractType === 'Stage') {
         if (!req.body.financialInfo.contractEndDate) {
           return res.status(400).json({
             error: 'Contract end date is required for CDD contracts'

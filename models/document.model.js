@@ -12,7 +12,7 @@ const documentSchema = new mongoose.Schema({
     enum: [
       "attestation",
       "fiche_paie",
-      "certificat",
+      "attestation_de_stage",
     ]
   },
   firstName:String,

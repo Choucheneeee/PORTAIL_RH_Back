@@ -7,6 +7,7 @@ const {
   createcertif,
   getRequestById,
   updateRequest,
+  createattestation_de_stage,
   deleteRequest,
   getCollaboratorRequests
 } = require("../controllers/documentController");
@@ -15,7 +16,7 @@ const auth = require("../middleware/auth");
 // Points de terminaison unifiés pour les demandes
 router.post("/fiche_paie", auth, createfiche);
 router.post("/attestation", auth, createattestation);
-router.post("/certificat", auth, createcertif);
+router.post("/attestation_de_stage", auth, createattestation_de_stage);
 
 router.get("/collaborator", auth, getCollaboratorRequests);
 router.get("/:id", auth, getRequestById);

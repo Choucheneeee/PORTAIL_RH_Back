@@ -1095,7 +1095,162 @@ const generateAttestationTravail = async (user, request) => {
   }
 };
 
+const generateAttestationStage = async (user, request) => {
+  try {
+    if (!user.professionalInfo || !user.cin) {
+      throw new Error('Informations professionnelles incomplètes');
+    }
+
+    // Validate internship specific fields
+    if (!user.financialInfo?.contractEndDate || !user.professionalInfo?.hiringDate) {
+      throw new Error('Dates de stage manquantes');
+    }
+
+    // Prepare internship dates
+    const startDate = new Date(user.professionalInfo.hiringDate).toLocaleDateString('fr-FR');
+    const endDate = new Date(user.financialInfo.contractEndDate).toLocaleDateString('fr-FR');
+
+    const docDefinition = {
+      pageMargins: [40, 130, 40, 60],
+      header: { /* Keep same header structure as travail version */ },
+      content: [
+        {
+          text: 'ATTESTATION DE STAGE',
+          style: 'documentTitle',
+          margin: [0, 20, 0, 20]
+        },
+        {
+          text: `Ref: STG/${new Date().getFullYear()}/${user._id.toString().slice(-4)}`,
+          style: 'reference',
+          margin: [0, 0, 0, 20]
+        },
+        {
+          text: [
+            `Je soussigné(e), ${process.env.HR_DIRECTOR || 'Directeur des Ressources Humaines'}, `,
+            `de la société ${process.env.COMPANY_NAME || 'notre entreprise'}, `,
+            `atteste par la présente que :`
+          ].join(''),
+          style: 'mainText',
+          margin: [0, 0, 0, 20]
+        },
+        {
+          ul: [
+            `Monsieur/Madame ${user.firstName} ${user.lastName}`,
+            `Né(e) le : ${new Date(user.personalInfo?.birthDate).toLocaleDateString('fr-FR') || 'N/A'}`,
+            `Titulaire de la CIN n° : ${user.cin}`,
+            `A effectué un stage au sein de notre entreprise du ${startDate} au ${endDate}`,
+            `Département : ${user.professionalInfo?.department || 'N/A'}`,
+            `Encadré par : ${user.professionalInfo?.position || 'Responsable de département'}`
+          ],
+          style: 'internDetails',
+          margin: [0, 0, 0, 25]
+        },
+        {
+          text: 'Objectifs du stage :',
+          style: 'sectionTitle',
+          margin: [0, 0, 0, 10]
+        },
+        {
+          text: user.professionalInfo?.jobDescription?.responsibilities?.map(resp => `• ${resp}`).join('\n') || 'N/A',
+          style: 'objectives',
+          margin: [20, 0, 0, 20]
+        },
+        {
+          text: [
+            'Au cours de cette période, l\'intéressé(e) a fait preuve de :',
+            '• Motivation et sérieux dans les tâches confiées',
+            '• Capacité d\'adaptation à notre environnement professionnel',
+            '• Esprit d\'équipe et sens des responsabilités'
+          ].join('\n'),
+          style: 'evaluation',
+          margin: [0, 0, 0, 20]
+        },
+        {
+          text: 'Cette attestation est délivrée à l\'intéressé(e) pour servir et valoir ce que de droit.',
+          style: 'purposeText',
+          margin: [0, 20]
+        },
+        {
+          columns: [
+            {
+              text: `Fait à ${process.env.COMPANY_CITY || 'Tunis'}, le ${new Date().toLocaleDateString('fr-FR')}`,
+              width: '*'
+            },
+            {
+              text: 'Le Responsable des Ressources Humaines',
+              alignment: 'right',
+              width: 200
+            }
+          ],
+          margin: [0, 30]
+        }
+      ],
+      styles: {
+        // Keep same base styles as travail version
+        internDetails: {
+          fontSize: 12,
+          lineHeight: 1.5,
+          bold: false,
+          color: '#2c3e50'
+        },
+        objectives: {
+          fontSize: 11,
+          color: '#34495e',
+          lineHeight: 1.4
+        },
+        evaluation: {
+          fontSize: 11,
+          color: '#2c3e50',
+          lineHeight: 1.5
+        },
+        sectionTitle: {
+          fontSize: 13,
+          bold: true,
+          color: '#1a237e'
+        }
+      }
+    };
+
+    // PDF generation and email sending (same as travail version)
+    const pdfDoc = pdfMake.createPdf(docDefinition);
+    
+    const pdfBuffer = await new Promise((resolve) => {
+      pdfDoc.getBuffer((buffer) => {
+        resolve(buffer);
+      });
+    });
+
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME} - RH" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Attestation de Stage',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto;">
+          <h2 style="color: #1a237e;">Votre attestation de stage</h2>
+          <p>Bonjour ${user.firstName} ${user.lastName},</p>
+          <p>Suite à votre demande, vous trouverez ci-joint votre attestation de stage.</p>
+          <p>Cordialement,<br>Service Ressources Humaines</p>
+        </div>
+      `,
+      attachments: [{
+        filename: `Attestation_Stage_${user.lastName}.pdf`,
+        content: pdfBuffer
+      }]
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return {
+      status: 'success',
+      message: 'Attestation de stage générée avec succès',
+      pdfGenerated: true
+    };
+
+  } catch (error) {
+    console.error('Erreur génération attestation de stage:', error);
+    throw new Error(`Échec de génération: ${error.message}`);
+  }
+};
 
 
-
-module.exports = {generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail};
+module.exports = {generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail,generateAttestationStage};

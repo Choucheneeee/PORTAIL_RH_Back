@@ -3,7 +3,7 @@ const Formation = require("../models/formation.model");
 const Conge = require("../models/conge.model");
 const Avance = require("../models/avance.model");
 const User = require("../models/User.model");
-const { generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail } = require("../utils/pdfGenerator");
+const { generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail,generateAttestationStage  } = require("../utils/pdfGenerator");
 
 
 
@@ -31,6 +31,8 @@ exports.updateRequest = async (req, res) => {
     if (!status) {
       return res.status(400).json({ error: "Status is required" });
     }
+    console.log("req.body",req.body)
+    console.log("endpoint",endpoint)
     if (!endpoint || (endpoint !== 'Document' && endpoint !== 'Formation' && endpoint !== 'Conge' && endpoint !== 'Avance')) {
       return res.status(400).json({ error: "This not demande type  valide" });
     }
@@ -76,7 +78,10 @@ exports.updateRequest = async (req, res) => {
                     throw new Error(`Période non supportée: ${request.periode}`);
                 }
                 break;
-            
+            case 'attestation_de_stage':
+                docData = await generateAttestationStage(user, request);
+                break;
+                        
             case 'attestation':
                 docData = await generateAttestationTravail(user, request);
                 break;

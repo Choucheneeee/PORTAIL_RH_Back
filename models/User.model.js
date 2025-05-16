@@ -51,7 +51,7 @@ const UserSchema = new mongoose.Schema({
     paymentMethod: String,
     contractType: {
       type: String,
-      enum: ['CDI', 'CDD'],
+      enum: ['CDI', 'CDD',"Stage"],
       default: 'CDI'
     },
     contractEndDate: {
