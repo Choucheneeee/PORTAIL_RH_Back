@@ -1,0 +1,36 @@
+{
+  "name": "back",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "choucheneeee",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@azure-rest/ai-inference": "^1.0.0-beta.6",
+    "@types/pdfmake": "^0.2.11",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "child_process": "^1.0.2",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.14.3",
+    "multer": "^1.4.5-lts.1",
+    "nlpcloud": "^2.0.8",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.10.0",
+    "path": "^0.12.7",
+    "pdfmake": "^0.2.19",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
