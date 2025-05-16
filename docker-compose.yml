@@ -31,3 +31,5 @@ networks:
   portal-network:
     name: portal-network
     driver: bridge
+
+
