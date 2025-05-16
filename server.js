@@ -26,7 +26,6 @@ const io = require('socket.io')(server, {
   path: '/socket.io'
 });
 
-//msg
 
 const swaggerOptions  = {
   definition: {
