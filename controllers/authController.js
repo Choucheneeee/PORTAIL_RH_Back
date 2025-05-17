@@ -281,6 +281,15 @@ exports.forgotPassword =async (req, res) => {
   }
 }
 
+exports.logout=async (req, res) => {
+  try {
+    console.log("logout called");
+    res.clearCookie('token');
+    res.status(200).json({ message: 'Logged out' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}
 exports.resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;

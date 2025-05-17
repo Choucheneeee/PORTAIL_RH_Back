@@ -1,6 +1,6 @@
 // Routes d'authentification
 const express = require("express");
-const { registerUser, loginUser,approveUser,verifyEmail,forgotPassword,resetPassword  } = require("../controllers/authController");
+const { registerUser, loginUser,approveUser,verifyEmail,forgotPassword,resetPassword,logout} = require("../controllers/authController");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 
@@ -16,6 +16,12 @@ router.post("/approve-user", authMiddleware, approveUser);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
+router.put("/logout", logout);
+
+router.get("/logout", async (req, res) => {
+    res.send("Test DB route");
+
+})
 
 /**
  * @swagger
