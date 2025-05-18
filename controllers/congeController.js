@@ -138,7 +138,7 @@ exports.createconge = async (req, res) => {
       hour: '2-digit', 
       minute: '2-digit' 
     })}
-    📧 ${email} | 🆔 ${id.slice(-6)}`;
+    📧 ${email}}`;
     
         const notifications = users.map(user => ({
           sender: id,

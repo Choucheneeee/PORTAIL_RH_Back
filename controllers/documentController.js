@@ -89,24 +89,23 @@ exports.createattestation=async(req,res)=>{
 }
 exports.createfiche = async (req, res) => {
   try {
-    console.log("dataa",req.body)
     const { documentType, periodType, month,year,description} = req.body;
     const userId = req.user.id;
     if (!documentType || !periodType) {
-      return res.status(400).json({ error: "Request type and document periode are required." });
+      return res.status(400).json({ error: "Le type de demande et la période du document sont requis." });
     }
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Utilisateur non trouvé" });
     }
     if(user?.financialInfo?.contractType==="Stage"){
-      return res.status(400).json({ error: "You must be a non stage to apply for this document." });
+      return res.status(400).json({ error: "Vous devez avoir un contrat autre que stage pour demander ce document." });
     }
     if(periodType=="mensuel"&&(!month || !year )){
-      return res.status(400).json({ error: "You must select a month and year  for this document." });
+      return res.status(400).json({ error: "Vous devez sélectionner un mois et une année pour ce document." });
     }
     if(periodType=="annuel"&&!year){
-      return res.status(400).json({ error: "You must select a year for this document." });
+      return res.status(400).json({ error: "Vous devez sélectionner une année pour ce document." });
     }
     const hiringDate = user?.professionalInfo?.hiringDate;
     const date = hiringDate ? new Date(hiringDate) : null;
@@ -114,11 +113,25 @@ exports.createfiche = async (req, res) => {
     const monthhiringDate = date && !isNaN(date) ? date.getMonth() + 1 : null;
     const yearhiringDate = date && !isNaN(date) ? date.getFullYear() : null;
 
-    if (periodType === "mensuel" && (monthhiringDate > month || yearhiringDate > year)) {
-      return res.status(400).json({ error: "You cannot apply for a document before your hiring date." });
+    if (periodType === "mensuel" && (yearhiringDate === year && monthhiringDate > month )) {
+      return res.status(400).json({ error: "Vous ne pouvez pas demander un document antérieur à votre date d'embauche." });
     }
-    if (periodType === "annuel" && yearhiringDate > year) {
-      return res.status(400).json({ error: "You cannot apply for a document before your hiring date." });
+    
+    // Validation pour empêcher la création de fiche de paie pour un mois futur
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth() + 1; // Les mois commencent à 0 en JavaScript
+    const currentYear = currentDate.getFullYear();
+    
+    if (periodType === "mensuel" && (year > currentYear || (year === currentYear && month > currentMonth))) {
+      return res.status(400).json({ error: "Vous ne pouvez pas créer une fiche de paie pour un mois futur." });
+    }
+    
+    if (periodType === "annuel" && year > currentYear) {
+      return res.status(400).json({ error: "Vous ne pouvez pas créer une fiche de paie pour une année future." });
+    }
+    
+    if (periodType === "annuel" && yearhiringDate >= year) {
+      return res.status(400).json({ error: "Vous ne pouvez pas demander un document antérieur à votre année d'embauche." });
     }
     // Check if the user already has a pending request for the same document type
     const existingRequest = await Demande.findOne({
@@ -128,7 +141,7 @@ exports.createfiche = async (req, res) => {
     });
 
     if (existingRequest) {
-      return res.status(400).json({ error: "You already have a pending request for this document type." });
+      return res.status(400).json({ error: "Vous avez déjà une demande en attente pour ce type de document." });
     }
     // Check if the user already has a pending request for the same document type
     const existingRequest2 = await Demande.findOne({
@@ -141,11 +154,9 @@ exports.createfiche = async (req, res) => {
     });
 
     if (existingRequest2) {
-      return res.status(400).json({ error: "You already have a pending request for this document type." });
+      return res.status(400).json({ error: "Vous avez déjà une demande approuvée pour ce type de document." });
     }
-    
 
-    
     // Get user details
     
     const requestData = {
@@ -160,8 +171,6 @@ exports.createfiche = async (req, res) => {
       requestDetails: description
     };
 
-   
-    
     const newRequest = new Demande(requestData);
     await newRequest.save();
 
@@ -178,7 +187,7 @@ exports.createfiche = async (req, res) => {
         user.email)
           }
 
-    res.status(201).json({ message: "Request submitted successfully", data: newRequest });
+    res.status(201).json({ message: "Demande soumise avec succès", data: newRequest });
 
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -361,7 +370,7 @@ async function sendNotification(emails, firstName, lastName, id, type, email) { 
   hour: '2-digit', 
   minute: '2-digit' 
 })}
-📧 ${email} | 🆔 ${id.slice(-6)}`;
+📧 ${email} }`;
 
     const notifications = users.map(user => ({
       sender: id,

@@ -7,23 +7,42 @@ const Notification = require('../models/notifications.model');
 
 exports.createavance=async(req,res)=>{
      try{
-            const {type,repaymentPeriod,reason,amount}=req.body
+            const {requestType,repaymentPeriod,reason,amount}=req.body
             const userId = req.user.id;
             console.log("body",req.body)
-            if(!reason || !type) return res.status(400).json({ error: "avance type and motif are required." });
+            if(!reason || !requestType) return res.status(400).json({ error: "avance type and motif are required." });
             const user = await User.findById(userId);
             if (!user) {
                 return res.status(404).json({ error: "User not found" });
               }
+            if(user?.financialInfo?.contractType!="CDI"){
+              return res.status(400).json({
+                  error: "Seul les employés en contrat CDI peuvent demander une avance."
+              });
+            }
+            if(user?.financialInfo?.salary<amount/2){
+              return res.status(400).json({
+                  error: "Vous ne pouvez pas demander une avance supérieure à votre salaire/2"
+              });
+              
+            }
+            console.log("type===pret",requestType==="pret")
+            if(requestType==="pret" ){
+              if(!repaymentPeriod) return res.status(400).json({ error: "repaymentPeriod is required." });
+            }
+            
             thismonth=new Date().getMonth()
             const exectingAvance= await Avance.find({
                 user: userId,
                 status: 'En attente',
+                type:requestType,
               });
               if(exectingAvance.length>0) return res.status(400).json({ error: "Vous avez déjà une demande en attente pour ce type de remboursement" });
 
               const avances = await Avance.find({
                 user: userId,
+                type:requestType,
+                status: 'Acceptée',
                 createdAt: {
                   $gte: new Date(new Date().getFullYear(), thismonth, 1),
                   $lt: new Date(new Date().getFullYear(), thismonth + 1, 1)
@@ -34,7 +53,7 @@ exports.createavance=async(req,res)=>{
 
               const avanceData = {
                 user: userId,
-                type:type,
+                type:requestType,
                 remboursement:repaymentPeriod,
                 motif:reason,
                 firstName: user.firstName,
@@ -54,7 +73,7 @@ exports.createavance=async(req,res)=>{
                       user.firstName,
                       user.lastName,
                       userId, 
-                      type,
+                      requestType,
                       user.email)
                         }
               
@@ -89,7 +108,7 @@ exports.createavance=async(req,res)=>{
       hour: '2-digit', 
       minute: '2-digit' 
     })}
-    📧 ${email} | 🆔 ${id.slice(-6)}`;
+    📧 ${email} }`;
     
         const notifications = users.map(user => ({
           sender: id,

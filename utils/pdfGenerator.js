@@ -360,7 +360,9 @@ const generateFichePaiAnnuel = async (user, request, annee,rh) => {
                 { image: `${user.signature}`, width: 300, height: 140 },
                 { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
               ],
-              width: '50%'
+              width: '50%',
+              alignment: 'left'
+              
             }
           ]
         }
@@ -376,6 +378,12 @@ const generateFichePaiAnnuel = async (user, request, annee,rh) => {
           bold: true,
           color: '#1a237e',
           margin: [0, 5]
+        },
+        signatureTitle: {
+          fontSize: 12,
+          bold: true,
+          color: '#1a237e',
+          alignment: 'left'
         },
         sectionHeader: {
           fillColor: '#1a237e',
@@ -435,7 +443,7 @@ const generateFichePaiAnnuel = async (user, request, annee,rh) => {
         signatureLabel: {
           fontSize: 10,
           color: '#444',
-          margin: [0, 5]
+          alignment: 'left'
         },
         companyStamp: {
           fontSize: 9,
@@ -706,7 +714,8 @@ const generateFichePaiMensuel = async (user, demande,rh) => {
                 { image: `${rh.signature}`, width: 300, height: 140 },
                 { text: process.env.COMPANY_NAME, style: 'companyStamp' }
               ],
-              width: '50%'
+              width: '50%',
+              alignment: 'left' // Ajout de l'alignement à gauche
             },
             {
               stack: [
@@ -715,9 +724,11 @@ const generateFichePaiMensuel = async (user, demande,rh) => {
                 { image: `${user.signature}`, width: 300, height: 140 },
                 { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
               ],
-              width: '50%'
+              width: '50%',
+              alignment: 'left' // Ajout de l'alignement à gauche
             }
-          ]
+          ],
+          margin: [20, 0] // Ajout d'une marge à gauche de 20
         }
       ],
       styles: {
@@ -790,8 +801,7 @@ const generateFichePaiMensuel = async (user, demande,rh) => {
         signatureLabel: {
           fontSize: 10,
           color: '#444',
-          margin: [0, 5]
-        },
+          alignment: 'left'        },
         companyStamp: {
           fontSize: 9,
           color: '#666',
@@ -962,11 +972,6 @@ const generateAttestationTravail = async (user, request,rh) => {
           margin: [20, 0, 0, 15]
         },
         {
-          text: 'Cette attestation est délivrée à l\'intéressé(e) sur sa demande pour servir et valoir ce que de droit.',
-          style: 'purposeText',
-          margin: [0, 20]
-        },
-        {
           text: `Fait à ${process.env.COMPANY_CITY || 'Tunis'}, le ${new Date().toLocaleDateString('fr-FR')}`,
           style: 'dateText',
           margin: [0, 20]
@@ -982,11 +987,11 @@ const generateAttestationTravail = async (user, request,rh) => {
 
               ],
               width: '*',
-              alignment: 'center'
+              alignment: 'left'
             }
           
           ],
-          margin: [0, 40]
+          margin: [20, 40]
         }
       ],
       styles: {
@@ -1035,7 +1040,7 @@ const generateAttestationTravail = async (user, request,rh) => {
           fontSize: 12,
           bold: true,
           color: '#1a237e',
-          margin: [0, 0, 0, 10]
+          alignment: 'left'
         },
         signatureText: {
           fontSize: 11,
@@ -1255,6 +1260,12 @@ const generateAttestationStage = async (user, request,rh) => {
             fontSize: 12,
             lineHeight: 1.5,
             alignment: 'justify'
+          },
+          signatureTitle: {
+            fontSize: 12,
+            bold: true,
+            color: '#1a237e',
+            alignment: 'left'
           },
           sectionTitle: {
             fontSize: 13,
