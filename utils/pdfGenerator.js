@@ -990,7 +990,7 @@ const generateAttestationTravail = async (user, request,rh) => {
               alignment: 'left'
             }
           
-          ],
+          ],  
           margin: [20, 40]
         }
       ],

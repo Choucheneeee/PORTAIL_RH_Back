@@ -30,6 +30,15 @@ exports.createformation = async(req, res) => {
         if (!user) {
             return res.status(404).json({ error: "Utilisateur non trouvé" });
         }
+        if (!user.cin || user.personalInfo.phone){
+          return res.status(400).json({ error: "Informations  Personnel  ou  Social nanciere incomplètes" });
+        }
+        if(user?.financialInfo?.contractType!='Stage'){
+          if(!user.financialInfo.RIB){
+            return res.status(400).json({ error: "Informations   ou financiere incomplètes" });
+  
+          }
+        }
         
         // Validation des dates
         const hiringDate = user?.professionalInfo?.hiringDate;

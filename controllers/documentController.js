@@ -111,7 +111,7 @@ exports.createfiche = async (req, res) => {
       throw new Error('Informations professionnelles incomplètes');
     }
     if (!user.cin || user.personalInfo.phone){
-      return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
+      return res.status(400).json({ error: "Informations  Personnel  ou  Social nanciere incomplètes" });
     }
     if(user?.financialInfo?.contractType==="Stage" ||user?.financialInfo?.contractType===null ){
       return res.status(400).json({ error: "Vous devez avoir un contrat autre que stage pour demander ce document." });
