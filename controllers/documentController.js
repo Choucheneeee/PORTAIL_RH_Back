@@ -102,6 +102,49 @@ exports.createfiche = async (req, res) => {
     if(user?.financialInfo?.contractType==="Stage"){
       return res.status(400).json({ error: "You must be a non stage to apply for this document." });
     }
+    if(periodType=="mensuel"&&(!month || !year )){
+      return res.status(400).json({ error: "You must select a month and year  for this document." });
+    }
+    if(periodType=="annuel"&&!year){
+      return res.status(400).json({ error: "You must select a year for this document." });
+    }
+    const hiringDate = user?.professionalInfo?.hiringDate;
+    const date = hiringDate ? new Date(hiringDate) : null;
+
+    const monthhiringDate = date && !isNaN(date) ? date.getMonth() + 1 : null;
+    const yearhiringDate = date && !isNaN(date) ? date.getFullYear() : null;
+
+    if (periodType === "mensuel" && (monthhiringDate > month || yearhiringDate > year)) {
+      return res.status(400).json({ error: "You cannot apply for a document before your hiring date." });
+    }
+    if (periodType === "annuel" && yearhiringDate > year) {
+      return res.status(400).json({ error: "You cannot apply for a document before your hiring date." });
+    }
+    // Check if the user already has a pending request for the same document type
+    const existingRequest = await Demande.findOne({
+      user: userId,
+      type: documentType,
+      status: 'En attente'
+    });
+
+    if (existingRequest) {
+      return res.status(400).json({ error: "You already have a pending request for this document type." });
+    }
+    // Check if the user already has a pending request for the same document type
+    const existingRequest2 = await Demande.findOne({
+      user: userId,
+      type: documentType,
+      status: 'Approuvé',
+      periode:periodType,
+      mois:month,
+      annee:year
+    });
+
+    if (existingRequest2) {
+      return res.status(400).json({ error: "You already have a pending request for this document type." });
+    }
+    
+
     
     // Get user details
     

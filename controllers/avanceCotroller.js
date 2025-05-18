@@ -15,6 +15,23 @@ exports.createavance=async(req,res)=>{
             if (!user) {
                 return res.status(404).json({ error: "User not found" });
               }
+            thismonth=new Date().getMonth()
+            const exectingAvance= await Avance.find({
+                user: userId,
+                status: 'En attente',
+              });
+              if(exectingAvance.length>0) return res.status(400).json({ error: "Vous avez déjà une demande en attente pour ce type de remboursement" });
+
+              const avances = await Avance.find({
+                user: userId,
+                createdAt: {
+                  $gte: new Date(new Date().getFullYear(), thismonth, 1),
+                  $lt: new Date(new Date().getFullYear(), thismonth + 1, 1)
+                }
+              })
+              if(avances.length>0) return res.status(400).json({ error: "Vous avez déjà une demande pour ce mois" });
+              
+
               const avanceData = {
                 user: userId,
                 type:type,

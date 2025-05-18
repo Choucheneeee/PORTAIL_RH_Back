@@ -5,49 +5,115 @@ const Notification = require('../models/notifications.model');
 
 
 
-exports.createconge=async(req,res)=>{
-     try{
-            const {type,date_Debut,date_Fin,motif}=req.body
-            const userId = req.user.id;
-            console.log("body",req.body)
-            if(!motif || !type) return res.status(400).json({ error: "conge type and motif are required." });
-            const user = await User.findById(userId);
-            if (!user) {
-                return res.status(404).json({ error: "User not found" });
-              }
-              const congeData = {
-                user: userId,
-                type:type,
-                date_Debut:date_Debut,
-                date_Fin:date_Fin,
-                motif:motif,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                status: 'En attente',
-              };
-            const newconge = new Conge(congeData);
-            await newconge.save();
-    
-            const rhs = await User.find({ role: "rh" });
-                  if (rhs.length > 0) {
-                    const rhsEmails = rhs.map(rh => rh.email);
-              
-                    await sendNotification(
-                      rhsEmails,
-                      user.firstName,
-                      user.lastName,
-                      userId, 
-                      type,
-                      user.email)
-                        }
-              
-                  res.status(201).json({ message: "Demande de conge submitted successfully", data: newconge });
-        }
-        catch(error){
-            res.status(500).json({ message: "Server error", error: error.message });
-    
-            }
-    }
+exports.createconge = async (req, res) => {
+  try {
+      const { type, date_Debut, date_Fin, motif } = req.body;
+      const userId = req.user.id;
+
+      // Validate required fields
+      if (!motif || !type) {
+          return res.status(400).json({ error: "Conge type and motif are required." });
+      }
+
+      // Date validation and parsing
+      const startDate = new Date(date_Debut);
+      const endDate = new Date(date_Fin);
+      const now = new Date();
+
+      // Remove time components for date comparison
+      const today = new Date(now.setHours(0, 0, 0, 0));
+      const startDay = new Date(startDate.setHours(0, 0, 0, 0));
+      const endDay = new Date(endDate.setHours(0, 0, 0, 0));
+
+      // Validate date formats
+      if (isNaN(startDate) || isNaN(endDate)) {
+          return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // Date comparison validations
+      if (startDay < today) {
+          return res.status(400).json({ error: "Start date cannot be in the past" });
+      }
+
+      if (endDay <= startDay) {
+          return res.status(400).json({ error: "End date must be after start date" });
+      }
+
+      // Calculate maximum allowed date (1 year from now)
+      const maxAllowedDate = new Date(today);
+      maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() + 1);
+
+      if (endDay > maxAllowedDate) {
+          return res.status(400).json({ error: "End date cannot be more than 1 year in the future" });
+      }
+
+      // Calculate business days (weekdays only)
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+      const timeDifference = endDate - startDate;
+      const daysDifference = Math.ceil(timeDifference / millisecondsPerDay) + 1;
+
+      // Find user and validate balance
+      const user = await User.findById(userId);
+      if (!user) {
+          return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.timeOffBalance < daysDifference) {
+          return res.status(400).json({
+              error: `Insufficient balance. Required: ${daysDifference} days, Available: ${user.timeOffBalance}`
+          });
+      }
+      else{
+        user.timeOffBalance -= daysDifference;
+        await user.save();
+      }
+
+
+      if (user.timeOffBalance === 0) {
+          return res.status(400).json({ error: "No remaining time off balance" });
+      }
+
+      // Create conge record
+      const congeData = {
+          user: userId,
+          type,
+          date_Debut: startDate,
+          date_Fin: endDate,
+          motif,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          status: 'En attente',
+      };
+
+      const newConge = new Conge(congeData);
+      await newConge.save();
+
+      // Notify HR team
+      const rhsUsers = await User.find({ role: "rh" });
+      if (rhsUsers.length > 0) {
+          const rhsEmails = rhsUsers.map(rh => rh.email);
+          await sendNotification(
+              rhsEmails,
+              user.firstName,
+              user.lastName,
+              userId,
+              type,
+              user.email
+          );
+      }
+
+      res.status(201).json({
+          message: "Demande de congé submitted successfully",
+          data: newConge
+      });
+  } catch (error) {
+      console.error("Conge creation error:", error);
+      res.status(500).json({
+          message: "Server error",
+          error: error.message
+      });
+  }
+};
     
     async function sendNotification(emails, firstName, lastName, id, type, email) { // Added 'io' as parameter
       try {
