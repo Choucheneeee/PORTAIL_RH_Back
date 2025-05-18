@@ -91,6 +91,10 @@ const UserSchema = new mongoose.Schema({
   createdAt: { 
     type: Date, 
     default: Date.now 
+  },
+  signature: {
+    type: String,  // Stores Base64 or URL
+    default: null
   }
 });
 

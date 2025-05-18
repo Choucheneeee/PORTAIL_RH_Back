@@ -237,6 +237,24 @@ exports.allusers = async (req, res) => {
     res.status(500).send("Error fetching users");
   }
 };
+exports.addsignature = async (req, res) => {
+  try {
+    const user=req.user.id;
+    console.log("signatur",req.body);
+    const signature=req.body.signature;
+    const userToUpdate = await User.findById(user);
+    if (!userToUpdate) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    userToUpdate.signature = signature;
+    await userToUpdate.save();
+    res.status(200).json({ message: "Signature added successfully" });
+
+  }
+  catch(error){
+    console.log(error);
+  }
+}
 
 exports.allusersRh = async (req, res) => {
   try { 

@@ -344,7 +344,7 @@ const generateFichePaiAnnuel = async (user, request, annee) => {
         {
           columns: [
             {
-              text: [
+              stack: [
                 { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
                 `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
@@ -353,10 +353,10 @@ const generateFichePaiAnnuel = async (user, request, annee) => {
               width: '50%'
             },
             {
-              text: [
+              stack: [
                 { text: 'Signature salarié\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                `${user.firstName} ${user.lastName}\n`,
+                { image: `${user.signature}`, width: 300, height: 140 },
                 { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
               ],
               width: '50%'
@@ -699,7 +699,7 @@ const generateFichePaiMensuel = async (user, demande) => {
         {
           columns: [
             {
-              text: [
+              stack: [
                 { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
                 `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
@@ -708,10 +708,10 @@ const generateFichePaiMensuel = async (user, demande) => {
               width: '50%'
             },
             {
-              text: [
+              stack: [
                 { text: 'Signature salarié\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                `${user.firstName} ${user.lastName}\n`,
+                { image: `${user.signature}`, width: 300, height: 140 },
                 { text: 'Reçu pour solde de tout compte', style: 'employeeStamp' }
               ],
               width: '50%'

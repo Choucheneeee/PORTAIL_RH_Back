@@ -95,15 +95,16 @@ exports.createfiche = async (req, res) => {
     if (!documentType || !periodType) {
       return res.status(400).json({ error: "Request type and document periode are required." });
     }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
     if(user?.financialInfo?.contractType==="Stage"){
       return res.status(400).json({ error: "You must be a non stage to apply for this document." });
     }
     
     // Get user details
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    
     const requestData = {
       user: userId,
       firstName: user.firstName,

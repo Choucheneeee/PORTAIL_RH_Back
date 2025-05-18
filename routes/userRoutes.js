@@ -1,6 +1,6 @@
 // Routes de gestion des utilisateurs
 const express = require("express");
-const { getuser, updateuser, allusers, approveUser,getuserRh, deleteuser,updateuserRh,allusersRh } = require("../controllers/userController");
+const { getuser, updateuser, allusers, approveUser,getuserRh, deleteuser,updateuserRh,allusersRh,addsignature } = require("../controllers/userController");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const upload = require('../utils/upload');
@@ -32,6 +32,8 @@ const nestFormatter = require('../utils/nestFormatter');
  *         description: Unauthorized
  */
 router.get("/getuser", authMiddleware, getuser);
+router.post("/addsignature", authMiddleware, addsignature);
+
 
 router.get("/getuserRh/:userId", authMiddleware, getuserRh);
 /**
