@@ -186,7 +186,7 @@ const calculatePayrollAnnuel = (user) => {
 };
 
 
-const generateFichePaiAnnuel = async (user, request, annee) => {
+const generateFichePaiAnnuel = async (user, request, annee,rh) => {
   try {
     if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
       throw new Error('Informations professionnelles incomplètes');
@@ -345,10 +345,11 @@ const generateFichePaiAnnuel = async (user, request, annee) => {
           columns: [
             {
               stack: [
-                { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
+                { text: 'Direction des Ressources Humaines', style: 'signatureTitle' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
+                { image: `${rh.signature}`, width: 300, height: 140 },
                 { text: process.env.COMPANY_NAME, style: 'companyStamp' }
+
               ],
               width: '50%'
             },
@@ -529,7 +530,7 @@ const generateFichePaiAnnuel = async (user, request, annee) => {
 };
 
 // Main Payslip Generation Function
-const generateFichePaiMensuel = async (user, demande) => {
+const generateFichePaiMensuel = async (user, demande,rh) => {
   try {
     // Validate required professional info
     if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
@@ -702,7 +703,7 @@ const generateFichePaiMensuel = async (user, demande) => {
               stack: [
                 { text: 'Cachet et signature employeur\n', style: 'signatureLabel' },
                 { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
-                `${process.env.HR_MANAGER_NAME || 'Responsable RH'}\n`,
+                { image: `${rh.signature}`, width: 300, height: 140 },
                 { text: process.env.COMPANY_NAME, style: 'companyStamp' }
               ],
               width: '50%'
@@ -880,7 +881,7 @@ const generateEmailTemplate = (user, demande, payrollData) => `
 `;
 
 
-const generateAttestationTravail = async (user, request) => {
+const generateAttestationTravail = async (user, request,rh) => {
   try {
     if (!user.professionalInfo || !user.cin) {
       throw new Error('Informations professionnelles incomplètes');
@@ -975,12 +976,15 @@ const generateAttestationTravail = async (user, request) => {
             {
               stack: [
                 { text: 'Direction des Ressources Humaines', style: 'signatureTitle' },
-                { text: 'Cachet et signature', style: 'signatureText' },
-                { canvas: [{ type: 'line', x1: 0, y1: 20, x2: 200, y2: 20 }] }
+                { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                { image: `${rh.signature}`, width: 220, height: 100 },
+                { text: process.env.COMPANY_NAME, style: 'companyStamp' }
+
               ],
               width: '*',
               alignment: 'center'
             }
+          
           ],
           margin: [0, 40]
         }
@@ -1095,7 +1099,7 @@ const generateAttestationTravail = async (user, request) => {
   }
 };
 
-const generateAttestationStage = async (user, request) => {
+const generateAttestationStage = async (user, request,rh) => {
   try {
     if (!user.professionalInfo || !user.cin) {
       throw new Error('Informations professionnelles incomplètes');
@@ -1214,8 +1218,11 @@ const generateAttestationStage = async (user, request) => {
               },
               {
                 stack: [
-                  { text: process.env.HR_DIRECTOR || 'Le Directeur des Ressources Humaines', style: 'signature' },
-                  { text: '(Signature et cachet)', style: 'signatureNote' }
+                  { text: 'Direction des Ressources Humaines', style: 'signatureTitle' },
+                  { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 1 }] },
+                  { image: `${rh.signature}`, width: 300, height: 140 },
+                  { text: process.env.COMPANY_NAME, style: 'companyStamp' }
+  
                 ],
                 width: 'auto',
                 alignment: 'right'

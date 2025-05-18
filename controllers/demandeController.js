@@ -1,6 +1,7 @@
 const Document = require("../models/document.model");
 const Formation = require("../models/formation.model");
 const Conge = require("../models/conge.model");
+const Notification = require("../models/notifications.model");
 const Avance = require("../models/avance.model");
 const User = require("../models/User.model");
 const { generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail,generateAttestationStage  } = require("../utils/pdfGenerator");
@@ -28,6 +29,12 @@ exports.updateRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const { status,endpoint } = req.body;
+    const idRh = req.user.id;
+    if (!id || !idRh) {
+      return res.status(400).json({ error: "ID and ID_RH are required" });
+    }
+
+
     if (!status) {
       return res.status(400).json({ error: "Status is required" });
     }
@@ -36,6 +43,14 @@ exports.updateRequest = async (req, res) => {
     if (!endpoint || (endpoint !== 'Document' && endpoint !== 'Formation' && endpoint !== 'Conge' && endpoint !== 'Avance')) {
       return res.status(400).json({ error: "This not demande type  valide" });
     }
+    const rh= await User.findById(idRh);
+    if (!rh) {
+      return res.status(404).json({ error: "Rh not found" });
+    }
+    if (rh.role !== 'rh') {
+      return res.status(403).json({ error: "Only RH can update requests" });
+    }
+
     let docData;
     let request;
     switch (endpoint) {
@@ -71,23 +86,19 @@ exports.updateRequest = async (req, res) => {
         switch(request.type) {
             case 'fiche_paie':
                 if (request.periode === "mensuel") {
-                    docData = await generateFichePaiMensuel(user, request);
+                    docData = await generateFichePaiMensuel(user, request,rh);
                 } else if (request.periode === "annuel") {
-                    docData = await generateFichePaiAnnuel(user, request, request.annee);
+                    docData = await generateFichePaiAnnuel(user, request, request.annee,rh);
                 } else {
                     throw new Error(`Période non supportée: ${request.periode}`);
                 }
                 break;
             case 'attestation_de_stage':
-                docData = await generateAttestationStage(user, request);
+                docData = await generateAttestationStage(user, request,rh);
                 break;
                         
             case 'attestation':
-                docData = await generateAttestationTravail(user, request);
-                break;
-                
-            case 'certificat':
-                docData = await generateCertificat(user, request);
+                docData = await generateAttestationTravail(user, request,rh);
                 break;
     
             default:
@@ -186,7 +197,7 @@ async function sendNotification(emails, firstName, lastName, id, type, email,end
   hour: '2-digit', 
   minute: '2-digit' 
 })}
-📧 ${email} | 🆔 ${id.slice(-6)}`;
+📧 ${email}}`;
 
     const notifications = users.map(user => ({
       sender: id,

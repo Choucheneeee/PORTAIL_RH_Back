@@ -6,7 +6,7 @@ const Avance = require("../models/avance.model");
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
-
+  console.log("userId", userId);
   User.findById(userId)
     .then(user => {
       if (!user) {
