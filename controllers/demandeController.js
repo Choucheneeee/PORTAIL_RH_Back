@@ -25,6 +25,25 @@ exports.getAllRequests = async (req, res) => {
   }
 };
 
+exports.getMyRequests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const demandes = await Document.find({ user: userId });
+    const formations= await Formation.find({ user: userId });
+    const conges= await Conge.find({ user: userId });
+    const avances= await Avance.find({ user: userId });
+
+    res.status(200).json(
+        { demandes, formations, conges, avances }
+    );  
+  }
+  catch(error) {
+    res.status(500).json({ error: error.message });
+  }
+  
+  
+}
+
 exports.updateRequest = async (req, res) => {
   try {
     const { id } = req.params;

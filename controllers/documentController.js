@@ -17,6 +17,9 @@ exports.createattestation_de_stage=async(req,res)=>{
     if(user?.financialInfo?.contractType!="Stage"){
       return res.status(400).json({ error: "You must be a stage to apply for this document." });
     }
+    if (!user.cin || user.personalInfo.phone){
+      return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
+    }
 
     const requestData = {
       user: userId,
@@ -55,10 +58,16 @@ exports.createattestation=async(req,res)=>{
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
+    
     if(user?.financialInfo?.contractType==="Stage"){
       return res.status(400).json({ error: "You must be a non stage to apply for this document." });
     }
-
+    if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS ) {
+      throw new Error('Informations professionnelles incomplètes');
+    }
+    if (!user.cin || user.personalInfo.phone){
+      return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
+    }
     const requestData = {
       user: userId,
       firstName: user.firstName,
@@ -98,7 +107,13 @@ exports.createfiche = async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "Utilisateur non trouvé" });
     }
-    if(user?.financialInfo?.contractType==="Stage"){
+    if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
+      throw new Error('Informations professionnelles incomplètes');
+    }
+    if (!user.cin || user.personalInfo.phone){
+      return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
+    }
+    if(user?.financialInfo?.contractType==="Stage" ||user?.financialInfo?.contractType===null ){
       return res.status(400).json({ error: "Vous devez avoir un contrat autre que stage pour demander ce document." });
     }
     if(periodType=="mensuel"&&(!month || !year )){
@@ -196,14 +211,6 @@ exports.createfiche = async (req, res) => {
 
 
 
-exports.getCollaboratorRequests = async (req, res) => {
-  try {
-    const requests = await Request.find({ user: req.user.id });
-    res.status(200).json(requests);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
 exports.getRequestById = async (req, res) => {
   try {

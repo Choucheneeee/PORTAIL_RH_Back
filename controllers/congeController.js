@@ -57,6 +57,16 @@ exports.createconge = async (req, res) => {
       if (!user) {
           return res.status(404).json({ error: "User not found" });
       }
+      if(user?.financialInfo?.contractType!='Stage'){
+        if(!user.financialInfo.RIB){
+          return res.status(400).json({ error: "Informations professionnelles ou financiere incomplètes" });
+
+        }
+
+      }
+      if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS ) {
+        throw new Error('Informations professionnelles ou financiere incomplètes');
+      }
 
       if (user.timeOffBalance < daysDifference) {
           return res.status(400).json({

@@ -45,7 +45,6 @@ const UserSchema = new mongoose.Schema({
   },
   financialInfo: {
     RIB: String,
-    bankAccount: String,
     taxId: String,
     CNSS: String,
     paymentMethod: String,
