@@ -127,8 +127,161 @@ exports.createconge = async (req, res) => {
       });
   }
 };
-    
-    async function sendNotification(emails, firstName, lastName, id, type, email) { // Added 'io' as parameter
+exports.getCongeById = async (req, res) => {
+      console.log("conge called")
+      const idrconge=req.params.id;
+      const conge = await Conge.findById(idrconge);
+      if (!conge) {
+          return res.status(404).json({ message: "Conge not found" });
+      }
+      res.status(200).json(conge);
+    }
+
+exports.updateConge = async (req, res) => {
+    try {
+        const congeId = req.params.id;
+        const { type, date_Debut, date_Fin, motif } = req.body;
+        const userId = req.user.id;
+
+        // Find the existing conge
+        const existingConge = await Conge.findById(congeId);
+        if (!existingConge) {
+            return res.status(404).json({ error: "Conge not found" });
+        }
+
+        // Check if the conge belongs to the user
+        if (existingConge.user.toString() !== userId) {
+            return res.status(403).json({ error: "Not authorized to update this conge" });
+        }
+
+        // Check if conge is already approved or rejected
+        if (existingConge.status !== 'En attente') {
+            return res.status(400).json({ error: "Cannot update conge that is not in pending status" });
+        }
+
+        // Validate required fields
+        if (!motif || !type) {
+            return res.status(400).json({ error: "Conge type and motif are required." });
+        }
+
+        // Date validation and parsing
+        const startDate = new Date(date_Debut);
+        const endDate = new Date(date_Fin);
+        const now = new Date();
+
+        // Remove time components for date comparison
+        const today = new Date(now.setHours(0, 0, 0, 0));
+        const startDay = new Date(startDate.setHours(0, 0, 0, 0));
+        const endDay = new Date(endDate.setHours(0, 0, 0, 0));
+
+        // Validate date formats
+        if (isNaN(startDate) || isNaN(endDate)) {
+            return res.status(400).json({ error: "Invalid date format" });
+        }
+
+        // Date comparison validations
+        if (startDay < today) {
+            return res.status(400).json({ error: "Start date cannot be in the past" });
+        }
+
+        if (endDay <= startDay) {
+            return res.status(400).json({ error: "End date must be after start date" });
+        }
+
+        // Calculate maximum allowed date (1 year from now)
+        const maxAllowedDate = new Date(today);
+        maxAllowedDate.setFullYear(maxAllowedDate.getFullYear() + 1);
+
+        if (endDay > maxAllowedDate) {
+            return res.status(400).json({ error: "End date cannot be more than 1 year in the future" });
+        }
+
+        // Calculate business days (weekdays only)
+        const millisecondsPerDay = 1000 * 60 * 60 * 24;
+        const timeDifference = endDate.getTime() - startDate.getTime();
+        const newDaysDifference = Math.ceil(timeDifference / millisecondsPerDay) + 1;
+        
+        // Convert existing dates to timestamps for calculation
+        const existingStartDate = new Date(existingConge.date_Debut).getTime();
+        const existingEndDate = new Date(existingConge.date_Fin).getTime();
+        const oldTimeDifference = existingEndDate - existingStartDate;
+        const oldDaysDifference = Math.ceil(oldTimeDifference / millisecondsPerDay) + 1;
+        
+        // Find user and validate balance
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Validate user information
+        if (!user.cin || !user.personalInfo.phone) {
+            return res.status(400).json({ error: "Informations Personnel ou Social nanciere incomplètes" });
+        }
+
+        if (user?.financialInfo?.contractType !== 'Stage') {
+            if (!user.financialInfo.RIB) {
+                return res.status(400).json({ error: "Informations professionnelles ou financiere incomplètes" });
+            }
+        }
+
+        if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
+            return res.status(400).json({ error: 'Informations professionnelles ou financiere incomplètes' });
+        }
+
+        // Adjust user's time off balance
+        const balanceAdjustment = newDaysDifference - oldDaysDifference;
+        if (user.timeOffBalance < balanceAdjustment) {
+            return res.status(400).json({
+                error: `Insufficient balance. Required: ${newDaysDifference} days, Available: ${user.timeOffBalance + oldDaysDifference}`
+            });
+        }
+
+        // Update user's balance
+        user.timeOffBalance -= balanceAdjustment;
+        await user.save();
+
+        // Update conge record
+        const updatedConge = await Conge.findByIdAndUpdate(
+            congeId,
+            {
+                type,
+                date_Debut: startDate,
+                date_Fin: endDate,
+                motif,
+                status: 'En attente' // Reset status to pending after update
+            },
+            { new: true }
+        );
+
+        // Notify HR team about the update
+        const rhsUsers = await User.find({ role: "rh" });
+        if (rhsUsers.length > 0) {
+            const rhsEmails = rhsUsers.map(rh => rh.email);
+            await sendNotification(
+                rhsEmails,
+                user.firstName,
+                user.lastName,
+                userId,
+                type,
+                user.email
+            );
+        }
+
+        res.status(200).json({
+            message: "Conge updated successfully",
+            data: updatedConge
+        });
+        
+    } catch (error) {
+        console.error("Conge update error:", error);
+        res.status(500).json({
+            message: "Server error",
+            error: error.message
+        });
+    }
+};
+
+    async function sendNotification(emails, firstName, lastName, id, type, email) { 
       try {
         console.log("emails",emails)
         const io = require('../server').io;

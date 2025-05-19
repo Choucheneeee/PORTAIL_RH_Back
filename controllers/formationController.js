@@ -170,7 +170,7 @@ exports.getformationById = async (req, res) => {
 exports.updateformation = async (req, res) => {
   try {
     const formationId = req.params.id;
-    const  form  = req.body;
+    const  form  = req.body;    
     const userId = req.user.id;
     console.log("form",req.body)
     console.log("form real  ",form)
@@ -210,7 +210,7 @@ exports.updateformation = async (req, res) => {
     const dateFin = new Date(form.date_Fin);
     const dateActuelle = new Date();
 
-    if (dateDebut < dateActuelle) {
+    if (dateDebut < dateActuelle) {     
       return res.status(400).json({
         error: "La date de début de formation ne peut pas être dans le passé."
       });
