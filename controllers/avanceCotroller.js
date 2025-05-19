@@ -21,7 +21,7 @@ exports.createavance=async(req,res)=>{
                   return res.status(400).json({ error: "Informations professionnelles ou financiere incomplètes" });
                 }
               }
-              if (!user.cin || user.personalInfo.phone){
+              if (!user.cin || !user.personalInfo.phone){
                 return res.status(400).json({ error: "Informations  Personnel  ou  Social nanciere incomplètes" });
               }
 

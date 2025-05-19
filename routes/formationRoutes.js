@@ -2,13 +2,15 @@
 const express = require("express");
 const Formation = require("../models/formation.model");
 const router = express.Router();
-const {  createformation } = require("../controllers/formationController");
+const {  createformation,getformationById,updateformation } = require("../controllers/formationController");
 const auth = require("../middleware/auth");
 
 
 router.post("/", auth, createformation);
 
+router.get("/:id",auth,getformationById);
 
+router.put("/update/:id",auth,updateformation);
 
 
 

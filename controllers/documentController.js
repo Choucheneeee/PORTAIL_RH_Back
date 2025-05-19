@@ -17,7 +17,7 @@ exports.createattestation_de_stage=async(req,res)=>{
     if(user?.financialInfo?.contractType!="Stage"){
       return res.status(400).json({ error: "You must be a stage to apply for this document." });
     }
-    if (!user.cin || user.personalInfo.phone){
+    if (!user.cin || !user.personalInfo.phone){
       return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
     }
 
@@ -65,7 +65,7 @@ exports.createattestation=async(req,res)=>{
     if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS ) {
       throw new Error('Informations professionnelles incomplètes');
     }
-    if (!user.cin || user.personalInfo.phone){
+    if (!user.cin || !user.personalInfo.phone){
       return res.status(400).json({ error: "Vous devez avoir un CIN pour demander ce document." });
     }
     const requestData = {
@@ -110,7 +110,7 @@ exports.createfiche = async (req, res) => {
     if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS) {
       throw new Error('Informations professionnelles incomplètes');
     }
-    if (!user.cin || user.personalInfo.phone){
+    if (!user.cin || !user.personalInfo.phone){
       return res.status(400).json({ error: "Informations  Personnel  ou  Social nanciere incomplètes" });
     }
     if(user?.financialInfo?.contractType==="Stage" ||user?.financialInfo?.contractType===null ){

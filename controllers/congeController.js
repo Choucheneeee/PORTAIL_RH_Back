@@ -57,7 +57,7 @@ exports.createconge = async (req, res) => {
       if (!user) {
           return res.status(404).json({ error: "User not found" });
       }
-      if (!user.cin || user.personalInfo.phone){
+      if (!user.cin || !user.personalInfo.phone){
         return res.status(400).json({ error: "Informations  Personnel  ou  Social nanciere incomplètes" });
       }
       if(user?.financialInfo?.contractType!='Stage'){
