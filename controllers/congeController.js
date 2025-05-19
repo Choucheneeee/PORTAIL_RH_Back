@@ -206,7 +206,7 @@ exports.updateConge = async (req, res) => {
         const existingEndDate = new Date(existingConge.date_Fin).getTime();
         const oldTimeDifference = existingEndDate - existingStartDate;
         const oldDaysDifference = Math.ceil(oldTimeDifference / millisecondsPerDay) + 1;
-        
+
         // Find user and validate balance
         const user = await User.findById(userId);
         if (!user) {
@@ -252,21 +252,7 @@ exports.updateConge = async (req, res) => {
             },
             { new: true }
         );
-
-        // Notify HR team about the update
-        const rhsUsers = await User.find({ role: "rh" });
-        if (rhsUsers.length > 0) {
-            const rhsEmails = rhsUsers.map(rh => rh.email);
-            await sendNotification(
-                rhsEmails,
-                user.firstName,
-                user.lastName,
-                userId,
-                type,
-                user.email
-            );
-        }
-
+        
         res.status(200).json({
             message: "Conge updated successfully",
             data: updatedConge
