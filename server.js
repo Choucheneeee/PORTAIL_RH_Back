@@ -60,6 +60,8 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 const startScheduledTasks = require('./utils/scheduledTasks');
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Middleware to get user ID from query parameter (for testing)
 io.use((socket, next) => {
