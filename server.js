@@ -134,13 +134,12 @@ io.on('connection', (socket) => {
     socket.on('notif', async (data) => {
         try {
             console.log(`\n--- NOUVELLE NOTIFICATION ---`);
-            console.log(`Expéditeur: ${socket.role} ${userId}`);
+            console.log(`Expéditeur: ${role} ${userId}`);
             console.log(`Contenu:`, JSON.stringify(data, null, 2));
 
-
-            if (socket.role === 'admin' || socket.role === 'rh') {
+            if (role === 'admin' || role === 'rh') {
                 if (data.type === 'new_user_approval') {
-                    const targetRoom = socket.role === 'admin' ? 'admins' : 'rhs';
+                    const targetRoom = role === 'admin' ? 'admins' : 'rhs';
                     io.to(targetRoom).emit('notif', {
                         type: 'new_user_approval',
                         message: data.message,
@@ -148,7 +147,6 @@ io.on('connection', (socket) => {
                     });
                     console.log(`Notification sent to ${targetRoom} room`);
                 } else if (data.targetUserId) {
-                    // Handle other types of notifications
                     const targetRoom = `user_${data.targetUserId}`;
                     const socketsInRoom = await io.in(targetRoom).allSockets();
                     
@@ -158,19 +156,36 @@ io.on('connection', (socket) => {
                     }
 
                     io.to(targetRoom).emit('notif', {
-                        type: 'request_update',
+                        type: data.type,
                         message: data.message,
                         senderId: userId,
                         timestamp: new Date().toISOString()
                     });
                 }
-            } else if (socket.role === 'collaborateur') {
-                io.to('rhs').emit('notif', {
-                    type: 'new_request',
-                    message: data.message,
-                    senderId: userId,
-                    timestamp: new Date().toISOString()
-                });
+            } else if (role === 'collaborateur') {
+
+                // Remove the fallback broadcast to all RHs
+               if (data.targetUserId) {
+                    const targetRoom = `user_${data.targetUserId}`;
+                    const socketsInRoom = await io.in(targetRoom).allSockets();
+                    
+                    if (socketsInRoom.size === 0) {
+                        console.warn(`L'utilisateur cible ${data.targetUserId} n'est pas connecté!`);
+                        return;
+                    }
+
+                    io.to(targetRoom).emit('notif', {
+                        type: data.type,
+                        message: data.message,
+                        senderId: userId,
+                        timestamp: new Date().toISOString()
+                    });
+                } else {
+                    // If no specific RH is targeted, return an error
+                    socket.emit('error', { 
+                        message: 'Veuillez spécifier un destinataire RH pour votre message.'
+                    });
+                }
             }
         } catch (error) {
             console.error("[ERREUR DE NOTIFICATION]", error.message);
