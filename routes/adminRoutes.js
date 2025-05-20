@@ -12,6 +12,7 @@ router.delete("/deleteuser/:userId", authMiddleware, deleteuser);
 
 router.get("/dashData",authMiddleware,getData)
 
+router.put("/updateruser/:id", authMiddleware, updateruser);
 
 
 /**

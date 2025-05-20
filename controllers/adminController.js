@@ -42,13 +42,18 @@ exports.allusers = async (req, res) => {
 };
 
 exports.updateruser = async (req, res) => {
-    try{
-        const userId=req.params.userId;
+    try{    
+        const userId=req.params.id;
+        const newRole=req.body.newRole;
         const updatedUser = await User.findById(userId);
+        console.log(req.params);
+        console.log(req.body);
+        console.log(userId);
+        console.log(newRole);
         if (!updatedUser) {
             return res.status(404).json({ message: "User not found" });
         }
-        updatedUser.set(req.body);
+        updatedUser.role = newRole;
         await updatedUser.save();
         res.status(200).json({ message: "User updated successfully", user: updatedUser });
 

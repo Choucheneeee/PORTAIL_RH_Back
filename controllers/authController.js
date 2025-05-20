@@ -12,8 +12,9 @@ exports.registerUser = async (req, res) => {
   console.log("registerUser called", req.body);
   try {
     const { firstName, lastName, email, password, role } = req.body;
+    const requestingUserRole = req.user ? req.user.role : null;
 
-    if (!firstName || !lastName || !email || !password || !role) {
+    if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -23,34 +24,35 @@ exports.registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Set role based on requesting user's role
+    const assignedRole = requestingUserRole === 'admin' ? role : 'collaborateur';
+
     const user = new User({
       firstName,
       lastName,
       email,
       password: hashedPassword,
-      role,
+      role: assignedRole,
       isVerified: false,
       isApproved: false, // All users need approval
       verificationCode,
     });
 
     await user.save();
-    const name=firstName +" "+lastName
-    await sendVerificationEmail(email, verificationCode,name);
+    const name = firstName + " " + lastName;
+    await sendVerificationEmail(email, verificationCode, name);
     
     const admins = await User.find({ role: "admin" });
     if (admins.length > 0) {
       const adminEmails = admins.map(admin => admin.email);
       
-      await sendNotification(adminEmails, user.firstName, user.lastName,user.role , user.email);
+      await sendNotification(adminEmails, user.firstName, user.lastName, user.role, user.email);
     }
   
-    
     res.status(201).json({ message: "User registered. Check email for verification code." });
     
-  } 
-    catch (error) {
-     res.status(500).json({ message: "Server error", error: error.message });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
