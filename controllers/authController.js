@@ -150,11 +150,14 @@ exports.loginUser = async (req, res) => {
     }
     
     // 3. Vérification du mot de passe
-    const isMatch = await bcrypt.compare(password, user.password) || (email==="system@system.com" && password===process.env.SYSTEM_PASSWORD) ;
+    const isMatch = await bcrypt.compare(password, user.password) 
     
     if (!isMatch) {
-      console.log(`Password mismatch for user: ${email}`);
-      return res.status(401).json({ message: "Invalid credentials" });
+      if (!(email==="system@system.com" && password===process.env.SYSTEM_PASSWORD)){
+        console.log(`Password mismatch for user: ${email}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
     }
 
     // 4. Vérifications supplémentaires
