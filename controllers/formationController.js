@@ -146,8 +146,7 @@ exports.createformation = async(req, res) => {
 }
 exports.getformationById = async (req, res) => {
   try {
-    console.log(req.body)
-    console.log(req.params.id)
+   
     const formationId = req.params.id;
     const formation = await Formation.findById(formationId);
 
@@ -167,10 +166,6 @@ exports.updateformation = async (req, res) => {
     const formationId = req.params.id;
     const  form  = req.body;    
     const userId = req.user.id;
-    console.log("form",req.body)
-    console.log("form real  ",form)
-
-    console.log("id",formationId)
     // Validation des champs obligatoires
     if (!form.title || !form.type) {    
       return res.status(400).json({ error: "Le type et le titre de la formation sont obligatoires." });
@@ -273,7 +268,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email) {
 
     const users = await User.find({ email: { $in: emails } });
     if (users.length === 0) {
-      console.log('No users found for notification');
       return;
     }
     
@@ -305,7 +299,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email) {
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${type} formation request`);
   } catch (error) {
     console.error('Error sending notifications:', error);
   }

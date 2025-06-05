@@ -46,10 +46,7 @@ exports.updateruser = async (req, res) => {
         const userId=req.params.id;
         const newRole=req.body.newRole;
         const updatedUser = await User.findById(userId);
-        console.log(req.params);
-        console.log(req.body);
-        console.log(userId);
-        console.log(newRole);
+        
         if (!updatedUser) {
             return res.status(404).json({ message: "User not found" });
         }

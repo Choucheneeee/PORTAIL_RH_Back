@@ -247,7 +247,6 @@ exports.updateRequest = async (req, res) => {
       return res.status(404).json({ error: "Request not found" });
     }
     const user = await User.findById(request.user);
-      console.log("request",request)
       if (status === 'Approuvé') {
 
         switch(request.type=='fiche_paie') {
@@ -295,18 +294,14 @@ exports.updateRequest = async (req, res) => {
 
 async function sendNotificationUpdateDemande(emails, type,status) { // Added 'io' as parameter
   try {
-    console.log("emails",emails)
     const io = require('../server').io;
 
-    console.log("io",io)
 
     const users = await User.find({ email: { $in: emails } });
     if (users.length === 0) {
-      console.log('No users found for notification');
       return;
     } 
-    console.log("users",users)
-    console.log("emails",emails)
+    
     
     const message = `📥 Votre demande ${type} a ete modifier ${status}
 🗓 ${new Date().toLocaleDateString('fr-FR', { 
@@ -329,7 +324,6 @@ async function sendNotificationUpdateDemande(emails, type,status) { // Added 'io
 
     users.forEach(user => {
       const userRoom = `user_${user._id}`;
-      console.log("userRoom", userRoom);
       io.to(userRoom).emit('notif', { 
         type: 'new_request',
         message: message,
@@ -337,7 +331,6 @@ async function sendNotificationUpdateDemande(emails, type,status) { // Added 'io
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
   } catch (error) {
     console.error('Error sending notifications:', error);
   }
@@ -369,15 +362,11 @@ exports.deleteRequest = async (req, res) => {
 // Email functions remain the same
 async function sendNotification(emails, firstName, lastName, id, type, email) { // Added 'io' as parameter
   try {
-    console.log("emails",emails)
     const io = require('../server').io;
 
-    console.log("io",io)
 
     const users = await User.find({ email: { $in: emails } });
-    console.log("users",users)
     if (users.length === 0) {
-      console.log('No users found for notification');
       return;
     }
     
@@ -402,7 +391,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email) { 
 
     users.forEach(user => {
       const userRoom = `user_${user._id}`;
-      console.log("userRoom", userRoom);
       io.to(userRoom).emit('notif', { 
         type: 'new_request',
         message: message,
@@ -410,7 +398,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email) { 
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
   } catch (error) {
     console.error('Error sending notifications:', error);
   }

@@ -9,14 +9,12 @@ exports.createavance=async(req,res)=>{
      try{
             const {requestType,repaymentPeriod,reason,amount}=req.body
             const userId = req.user.id;
-            console.log("body",req.body)
             if(!reason || !requestType) return res.status(400).json({ error: "avance type and motif are required." });
             const user = await User.findById(userId);
             if (!user) {
                 return res.status(404).json({ error: "User not found" });
               }
             if(user?.financialInfo?.contractType!='Stage'){
-              console.log("user",user)
                 if(!user.financialInfo.RIB){
                   return res.status(400).json({ error: "Informations professionnelles ou financiere incomplètes" });
                 }
@@ -36,7 +34,6 @@ exports.createavance=async(req,res)=>{
               });
               
             }
-            console.log("type===pret",requestType==="pret")
             if(requestType==="pret" ){
               if(!repaymentPeriod) return res.status(400).json({ error: "repaymentPeriod is required." });
             }
@@ -231,15 +228,11 @@ exports.updateAvance = async (req, res) => {
 };
     async function sendNotification(emails, firstName, lastName, id, type, email) { // Added 'io' as parameter
       try {
-        console.log("emails",emails)          
         const io = require('../server').io;
     
-        console.log("io",io)
     
         const users = await User.find({ email: { $in: emails } });
-        console.log("users",users)
         if (users.length === 0) {
-          console.log('No users found for notification');
           return;
         }
         
@@ -264,7 +257,6 @@ exports.updateAvance = async (req, res) => {
     
         users.forEach(user => {
           const userRoom = `user_${user._id}`;
-          console.log("userRoom", userRoom);
           io.to(userRoom).emit('notif', { 
             type: 'new_request',
             message: message,
@@ -272,7 +264,6 @@ exports.updateAvance = async (req, res) => {
           });
         });
     
-        console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
       } catch (error) {
         console.error('Error sending notifications:', error);
       }

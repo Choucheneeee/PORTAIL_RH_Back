@@ -57,8 +57,6 @@ exports.updateRequest = async (req, res) => {
     if (!status) {
       return res.status(400).json({ error: "Status is required" });
     }
-    console.log("req.body",req.body)
-    console.log("endpoint",endpoint)
     if (!endpoint || (endpoint !== 'Document' && endpoint !== 'Formation' && endpoint !== 'Conge' && endpoint !== 'Avance')) {
       return res.status(400).json({ error: "This not demande type  valide" });
     }
@@ -195,15 +193,10 @@ exports.deleteRequest = async (req, res) => {
 
 async function sendNotification(emails, firstName, lastName, id, type, email,endpoint) { // Added 'io' as parameter
   try {
-    console.log("emails",emails)
     const io = require('../server').io;
-    console.log("id",id)
-    console.log("io",io)
 
     const users = await User.find({ email: { $in: emails } });
-    console.log("users",users)
     if (users.length === 0) {
-      console.log('No users found for notification');
       return;
     }
     
@@ -228,7 +221,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email,end
 
     users.forEach(user => {
       const userRoom = `user_${user._id}`;
-      console.log("userRoom", userRoom);
       io.to(userRoom).emit('notif', { 
         type: 'new_request',
         message: message,
@@ -236,7 +228,6 @@ async function sendNotification(emails, firstName, lastName, id, type, email,end
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
   } catch (error) {
     console.error('Error sending notifications:', error);
   }

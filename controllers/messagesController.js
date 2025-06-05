@@ -3,7 +3,6 @@ const User = require('../models/User.model'); // Assuming you have a User model
 
 // Send a new message
 exports.sendMessage = async (req, res) => {
-  console.log("message",req.body)
   try {
     const { receiver, content,sender,timestamp} = req.body;
 
@@ -23,7 +22,6 @@ exports.sendMessage = async (req, res) => {
 
     res.status(201).json(message);
   } catch (error) {
-    console.log(error,"error")
     res.status(500).json({ error: error.message });
   }
 };
@@ -79,9 +77,6 @@ exports.deleteMessage = async (req, res) => {
   try {
     const { id } = req.params;
     const currentUserId = req.user.id;
-    console.log(req.user,"req.user")
-    console.log(currentUserId,"currentUserId")
-    console.log(id,"id")
     const message = await Message.findByIdAndDelete({ _id: id, sender: currentUserId });
     if (!message) {
       return res.status(404).json({ error: 'Message not found or unauthorized' });

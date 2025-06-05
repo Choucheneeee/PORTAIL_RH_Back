@@ -6,7 +6,6 @@ const Avance = require("../models/avance.model");
 
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
-  console.log("userId", userId);
   User.findById(userId)
     .then(user => {
       if (!user) {
@@ -21,7 +20,6 @@ exports.getuser = async (req, res) => {
 
 exports.getuserRh = async (req, res) => {
   const userId = req.params.userId; // Get userId from request parameters
-  console.log("userId", userId);
   User.findById(userId)
     .then(user => {
       if (!user) {
@@ -240,7 +238,6 @@ exports.allusers = async (req, res) => {
 exports.addsignature = async (req, res) => {
   try {
     const user=req.user.id;
-    console.log("signatur",req.body);
     const signature=req.body.signature;
     const userToUpdate = await User.findById(user);
     if (!userToUpdate) {

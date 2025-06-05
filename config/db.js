@@ -10,6 +10,8 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       maxPoolSize: 10,
       socketTimeoutMS: 45000,
+      useNewUrlParser: true, 
+      useUnifiedTopology: true
     });
     console.log("✅ MongoDB connecté !");
     await getSystemUser();

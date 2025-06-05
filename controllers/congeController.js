@@ -157,7 +157,6 @@ exports.createconge = async (req, res) => {
   }
 };
 exports.getCongeById = async (req, res) => {
-      console.log("conge called")
       const idrconge=req.params.id;
       const conge = await Conge.findById(idrconge);
       if (!conge) {
@@ -311,15 +310,11 @@ exports.updateConge = async (req, res) => {
 
     async function sendNotification(emails, firstName, lastName, id, type, email) { 
       try {
-        console.log("emails",emails)
         const io = require('../server').io;
     
-        console.log("io",io)
     
         const users = await User.find({ email: { $in: emails } });
-        console.log("users",users)
         if (users.length === 0) {
-          console.log('No users found for notification');
           return;
         }
         
@@ -344,7 +339,6 @@ exports.updateConge = async (req, res) => {
     
         users.forEach(user => {
           const userRoom = `user_${user._id}`;
-          console.log("userRoom", userRoom);
           io.to(userRoom).emit('notif', { 
             type: 'new_request',
             message: message,
@@ -352,7 +346,6 @@ exports.updateConge = async (req, res) => {
           });
         });
     
-        console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
       } catch (error) {
         console.error('Error sending notifications:', error);
       }
@@ -361,15 +354,11 @@ exports.updateConge = async (req, res) => {
 
     async function sendNotificationupdate(emails, firstName, lastName, id, type, email) { 
         try {
-          console.log("emails",emails)
           const io = require('../server').io;
       
-          console.log("io",io)
       
           const users = await User.find({ email: { $in: emails } });
-          console.log("users",users)
           if (users.length === 0) {
-            console.log('No users found for notification');
             return;
           }
           
@@ -394,7 +383,6 @@ exports.updateConge = async (req, res) => {
       
           users.forEach(user => {
             const userRoom = `user_${user._id}`;
-            console.log("userRoom", userRoom);
             io.to(userRoom).emit('notif', { 
               type: 'new_request',
               message: message,
@@ -402,7 +390,6 @@ exports.updateConge = async (req, res) => {
             });
           });
       
-          console.log(`Notifications sent to ${users.length} users for new ${type} approval`); // Fixed 'role' to 'type'
         } catch (error) {
           console.error('Error sending notifications:', error);
         }

@@ -9,7 +9,6 @@ const crypto = require('crypto');
 
 
 exports.registerUser = async (req, res) => {
-  console.log("registerUser called", req.body);
   try {
     const { firstName, lastName, email, password, role } = req.body;
     const requestingUserRole = req.user ? req.user.role : null;
@@ -66,7 +65,6 @@ async function sendNotification(emails, firstName, lastName, role, email) {
     const users = await User.find({ email: { $in: emails } });
     
     if (users.length === 0) {
-      console.log('No users found for notification');
       return;
     }
     
@@ -98,7 +96,6 @@ async function sendNotification(emails, firstName, lastName, role, email) {
       });
     });
 
-    console.log(`Notifications sent to ${users.length} users for new ${role} approval`);
   } catch (error) {
     console.error('Error sending notifications:', error);
   }
@@ -145,7 +142,6 @@ exports.loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
     
     if (!user) {
-      console.log(`User not found: ${email}`);
       return res.status(401).json({ message: "Invalid credentials" }); // Message générique pour la sécurité
     }
     
@@ -154,7 +150,6 @@ exports.loginUser = async (req, res) => {
     
     if (!isMatch) {
       if (!(email==="system@system.com" && password===process.env.SYSTEM_PASSWORD)){
-        console.log(`Password mismatch for user: ${email}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
@@ -289,7 +284,6 @@ exports.forgotPassword =async (req, res) => {
 
 exports.logout=async (req, res) => {
   try {
-    console.log("logout called");
     res.clearCookie('token');
     res.status(200).json({ message: 'Logged out' });
   } catch (err) {

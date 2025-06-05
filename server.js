@@ -84,10 +84,8 @@ io.on('connection', (socket) => {
     const { userId, role } = socket.handshake.auth;
     if (!userId || !role) {
         socket.disconnect(true);
-        console.log("Authentification requise");
         return;
     }
-    console.log(`${role} ${userId} connecté`);
 
     // Store socket reference for this user
     if (!userSockets.has(userId)) {
@@ -145,7 +143,6 @@ io.on('connection', (socket) => {
                         message: data.message,
                         timestamp: new Date().toISOString()
                     });
-                    console.log(`Notification sent to ${targetRoom} room`);
                 } else if (data.targetUserId) {
                     const targetRoom = `user_${data.targetUserId}`;
                     const socketsInRoom = await io.in(targetRoom).allSockets();

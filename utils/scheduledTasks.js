@@ -11,7 +11,6 @@ const deleteUnverifiedUsers = async () => {
             createdAt: { $lt: twentyFourHoursAgo }
         });
 
-        console.log(`Deleted ${result.deletedCount} unverified users older than 24 hours`);
     } catch (error) {
         console.error('Error in deleteUnverifiedUsers task:', error);
     }
@@ -19,11 +18,9 @@ const deleteUnverifiedUsers = async () => {
 
 const startScheduledTasks = () => {
     cron.schedule('0 * * * *', () => {
-        console.log('Running scheduled task to check for unverified users...');
         deleteUnverifiedUsers();
     });
 
-    console.log('Running initial check for unverified users...');
     deleteUnverifiedUsers();
 };
 
