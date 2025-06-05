@@ -2,6 +2,7 @@ const Formation = require("../models/formation.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const Notification = require('../models/notifications.model');
+const Activite = require("../models/activite.model")
 
 
 exports.createformation = async(req, res) => {
@@ -115,7 +116,12 @@ exports.createformation = async(req, res) => {
                 error: "Vous avez déjà une demande de formation qui chevauche ces dates." 
             });
         }
-        
+        const activite =new Activite({
+          user:user.email,
+          type:"Ajouter demande de formation",
+          description:`${user.role} a ajouter un demande de formation ${type} `
+        });
+        await activite.save();
         // Sauvegarde de la formation
         const newFormation = new Formation(formationData);
         await newFormation.save();

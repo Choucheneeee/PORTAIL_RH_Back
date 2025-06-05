@@ -2,6 +2,7 @@ const Avance = require("../models/avance.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const Notification = require('../models/notifications.model');
+const Activite = require("../models/activite.model")
 
 
 
@@ -57,7 +58,12 @@ exports.createavance=async(req,res)=>{
               })
               if(avances.length>0) return res.status(400).json({ error: "Vous avez déjà une demande pour ce mois" });
               
-
+              const activite = new Activite({
+                user:user.email,
+                type:`Ajouter demande de avance/pret `,
+                description:`${user.role} a ajouter un demande de ${requestType} `
+              });
+              await activite.save();
               const avanceData = {
                 user: userId,
                 type:requestType,

@@ -1,5 +1,5 @@
 const User = require("../models/User.model");
-
+const Activite =require("../models/activite.model")
 
 
 
@@ -40,7 +40,17 @@ exports.allusers = async (req, res) => {
     res.status(500).send("Error fetching users");
   }
 };
-
+exports.getact = async (req, res) => {
+  try {
+    console.log("act request");
+    const act = await Activite.find();
+    console.log("act", act);
+    res.json(act);
+  } catch (error) {
+    console.error("Error fetching Activite:", error);
+    res.status(500).json({ error: "Error fetching Activite", details: error.message });
+  }
+}
 exports.updateruser = async (req, res) => {
     try{    
         const userId=req.params.id;

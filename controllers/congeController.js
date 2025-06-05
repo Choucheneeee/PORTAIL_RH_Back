@@ -2,6 +2,7 @@ const Conge = require("../models/conge.model");
 const nodemailer = require("nodemailer");
 const User = require("../models/User.model");
 const Notification = require('../models/notifications.model');
+const Activite = require("../models/activite.model")
 
 
 
@@ -112,8 +113,12 @@ exports.createconge = async (req, res) => {
             });
         }
        
-
-      // Check if user has already submitted a conge request
+        const activite = new Activite({
+          user:user.email,
+          type:"Ajouter demande de congé",
+          description:`${user.role} a ajouter un demande de congé ${type}`
+        });
+        await activite.save();
 
       // Create conge record
       const congeData = {

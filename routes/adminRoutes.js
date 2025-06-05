@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const adminController = require("../controllers/adminController");
-const { allusers,updateruser,deleteuser,getData } = require("../controllers/adminController");
+const { allusers,updateruser,deleteuser,getData,getact} = require("../controllers/adminController");
 
 // router.get("/getuser", authMiddleware, getuser);
 
@@ -13,7 +13,7 @@ router.delete("/deleteuser/:userId", authMiddleware, deleteuser);
 router.get("/dashData",authMiddleware,getData)
 
 router.put("/updateruser/:id", authMiddleware, updateruser);
-
+router.get("/activite",authMiddleware,getact)
 
 /**
  * @swagger

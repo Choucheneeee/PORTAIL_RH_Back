@@ -5,7 +5,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require('crypto');
-
+const Activite = require("../models/activite.model")
 
 
 exports.registerUser = async (req, res) => {
@@ -174,6 +174,15 @@ exports.loginUser = async (req, res) => {
       process.env.JWT_SECRET, 
       { expiresIn: "1d" }
     );
+    
+    const activite = new Activite({
+      user:email,
+      type:"Login",
+      description:`${user.role} a s'authentifier avec succès`
+      
+    });
+    await activite.save();
+
 
     // 6. Réponse sans données sensibles
     res.status(200).json({

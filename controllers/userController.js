@@ -3,7 +3,7 @@ const Request = require("../models/document.model");
 const Formation = require("../models/formation.model");
 const Conge = require("../models/conge.model");
 const Avance = require("../models/avance.model");
-
+const Activite =require("../models/activite.model")
 exports.getuser = async (req, res) => {
   const userId = req.user.id; 
   User.findById(userId)
@@ -88,7 +88,14 @@ const updateuser = async (req, res) => {
         req.body.financialInfo.contractEndDate = null;
       }
     }
+    const user = await User.findById(userId);
 
+    const activite = new Activite({
+      user:user.email,
+      type:`modifier profile`,
+      description:`${user.role} a modifier son profile `
+    });
+    await activite.save();
     // 4. Update user with all fields
     const updatedUser = await User.findByIdAndUpdate(
       userId,
@@ -167,8 +174,14 @@ exports.updateuserRh = async (req, res) => {
         req.body.financialInfo.contractEndDate = null;
       }
     }
+    const user = await User.findById(userId);
 
-    // 4. Update user with all fields
+    const activite = new Activite({
+      user:user.email,
+      type:`modifier profile`,
+      description:`Rh a modifier de profile ${user.email} `
+    });
+    await activite.save();
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: req.body },

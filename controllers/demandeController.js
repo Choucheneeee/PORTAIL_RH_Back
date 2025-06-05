@@ -5,6 +5,7 @@ const Notification = require("../models/notifications.model");
 const Avance = require("../models/avance.model");
 const User = require("../models/User.model");
 const { generateFichePaiMensuel,generateFichePaiAnnuel,generateAttestationTravail,generateAttestationStage  } = require("../utils/pdfGenerator");
+const Activite = require("../models/activite.model")
 
 
 
@@ -123,6 +124,12 @@ exports.updateRequest = async (req, res) => {
         }
     }
     
+    const activite = new Activite({
+      user:user.email,
+      type:"Modifer le status de demande",
+      description:`Le demande de ${endpoint} à était ${status} `
+    });
+    await activite.save();
     // Update the request status
     request.status = status;
     await request.save();
