@@ -123,6 +123,29 @@ exports.updateRequest = async (req, res) => {
                 throw new Error(`Type de document non supporté: ${request.type}`);
         }
     }
+    if (status === 'Approuvé' && endpoint === 'Conge') {
+      // Calculate the number of days
+      const startDate = new Date(request.date_Debut);
+      const endDate = new Date(request.date_Fin);
+      const millisecondsPerDay = 1000 * 60 * 60 * 24;
+      const timeDifference = endDate - startDate;
+      const daysDifference = Math.ceil(timeDifference / millisecondsPerDay) + 1;
+
+      // Check if user has sufficient balance for the specific type of leave
+      if (!user.timeOffBalance[request.type]) {
+        return res.status(400).json({ error: "Invalid leave type" });
+      }
+
+      if (user.timeOffBalance[request.type] < daysDifference) {
+        return res.status(400).json({
+          error: `Insufficient ${request.type} balance. Required: ${daysDifference} days, Available: ${user.timeOffBalance[request.type]}`
+        });
+      }
+
+      // Deduct the days from the specific leave balance
+      user.timeOffBalance[request.type] -= daysDifference;
+      await user.save();
+    }
     
     const activite = new Activite({
       user:user.email,

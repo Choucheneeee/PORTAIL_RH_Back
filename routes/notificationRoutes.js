@@ -10,6 +10,8 @@ router.post("/send-notification", authMiddleware, notificationController.createN
 // Obtenir les notifications d'un utilisateur
 router.get("/get-notification/:userId", notificationController.getNotifications);
 
+router.delete("/delete/:id",authMiddleware, notificationController.deleteNotification);
+
 /**
  * @swagger
  * tags:

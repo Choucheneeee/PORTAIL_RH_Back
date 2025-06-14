@@ -47,7 +47,27 @@ exports.createNotification = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 }
-    
+exports.deleteNotification = async (req, res) => {
+  try {
+    const notificationId = req.params.id;
+    const userId = req.user.id;
+
+    const notif = await notification.findById(notificationId);
+    if (!notif) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    if (notif.recipient.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized to delete this notification' });
+    }
+
+    await notif.deleteOne();
+    return res.status(200).json({ message: 'Notification deleted successfully' });
+  }
+  catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}    
 exports.getNotifications =async (req,res)=>{
   try {
     const userId=req.params.userId

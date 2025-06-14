@@ -9,6 +9,7 @@ const UserSchema = new mongoose.Schema({
     default: null,
     unique: false,
   },
+  
   email: { 
     type: String, 
     unique: true, 
@@ -41,7 +42,12 @@ const UserSchema = new mongoose.Schema({
     phone: String,
     countryCode: String,
     address: String,
-    birthDate: Date
+    birthDate: Date,
+    sexe: {
+      type: String,
+      enum: ["homme", "femme"],
+      required: false
+    },
   },
   financialInfo: {
     RIB: String,
@@ -83,13 +89,32 @@ const UserSchema = new mongoose.Schema({
     maritalStatus: String,
     children: Number
   },
-  timeOffBalance: { 
-    type: Number, 
-    default: 28 
+  
+  timeOffBalance: {
+    annuel: {
+      type: Number,
+      default: 24
+    },
+    maladie: {
+      type: Number,
+      default: 180
+    },
+    sans_solde: {
+      type: Number,
+      default: 4
+    },
+    maternité: {
+      type: Number,
+      default: 90
+    },
+    paternité: {
+      type: Number,
+      default: 7
+    }
   },
-  createdAt: { 
-    type: Date, 
-    default: Date.now 
+  createdAt: {
+    type: Date,
+    default: Date.now
   },
   signature: {
     type: String,  // Stores Base64 or URL

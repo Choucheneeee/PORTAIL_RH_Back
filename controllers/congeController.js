@@ -65,25 +65,24 @@ exports.createconge = async (req, res) => {
         if(!user.financialInfo.RIB){
           return res.status(400).json({ error: "Informations professionnelles ou financiere incomplètes" });
         }
-
       }
       if (!user.professionalInfo?.salary || !user.financialInfo?.CNSS ) {
         throw new Error('Informations professionnelles ou financiere incomplètes');
       }
 
-      if (user.timeOffBalance < daysDifference) {
+      // Check if user has sufficient balance for the specific type of leave
+      if (!user.timeOffBalance[type]) {
+          return res.status(400).json({ error: "Invalid leave type" });
+      }
+
+      if (user.timeOffBalance[type] < daysDifference) {
           return res.status(400).json({
-              error: `Insufficient balance. Required: ${daysDifference} days, Available: ${user.timeOffBalance}`
+              error: `Insufficient ${type} balance. Required: ${daysDifference} days, Available: ${user.timeOffBalance[type]}`
           });
       }
-      else{
-        user.timeOffBalance -= daysDifference;
-        await user.save();
-      }
-
-
-      if (user.timeOffBalance === 0) {
-          return res.status(400).json({ error: "No remaining time off balance" });
+      
+      if (user.timeOffBalance[type] === 0) {
+          return res.status(400).json({ error: `No remaining ${type} balance` });
       }
       //VERIFIER SI L'UTILISATEUR a deja une demande de conge en attente
       const existingPendingConge = await Conge.findOne({
@@ -161,6 +160,31 @@ exports.createconge = async (req, res) => {
       });
   }
 };
+
+exports.gegsolde = async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.status(200).json({
+        annuel: user.timeOffBalance.annuel,
+        maladie: user.timeOffBalance.maladie,
+        maternite: user.timeOffBalance.maternité,
+        paternite: user.timeOffBalance.paternité,
+        sans_solde: user.timeOffBalance.sans_solde,
+        sexe:user.personalInfo.sexe,
+      });
+    }
+    catch (error) {
+      console.error("Conge creation error:", error);
+      res.status(500).json({
+          message: "Server error",
+          error: error.message
+      });
+    }
+  };
 exports.getCongeById = async (req, res) => {
       const idrconge=req.params.id;
       const conge = await Conge.findById(idrconge);

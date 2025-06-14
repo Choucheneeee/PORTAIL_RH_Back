@@ -34,16 +34,25 @@ const client = ModelClient(
   new AzureKeyCredential(token),
 );
 
+// Define the system prompt for HR context
+const HR_SYSTEM_PROMPT = {
+  role: "system",
+  content: "You are an HR assistant specialized in human resources management and HR portal inquiries. Only respond to questions related to: 1) Employee management 2) Leave and absence management 3) Payroll and compensation 4) HR policies and procedures 5) Training and development 6) Recruitment and onboarding 7) Performance management 8) Employee benefits 9) HR documentation 10) HR portal usage. If a question is not related to HR or employee management, respond with: 'I can only assist with HR-related inquiries. Please ask a question about human resources management or the HR portal.'"
+};
+
 // Route for chat completions
 const sendMessage = async (req, res) => {
   try {
     const { messages } = req.body;
 
+    // Add the system prompt at the beginning of the conversation
+    const messagesWithSystemPrompt = [HR_SYSTEM_PROMPT, ...messages];
+
     const response = await client.path("/chat/completions").post({
       body: {
-        messages: messages,
-        temperature: 1,
-        top_p: 1,
+        messages: messagesWithSystemPrompt,
+        temperature: 0.7,
+        top_p: 0.9,
         model: model
       }
     });
